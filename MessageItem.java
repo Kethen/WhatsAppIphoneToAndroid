@@ -20,7 +20,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	String media_mime_type; // ZVCARDSTRING in ZWAMEDIAITEM if ZMEDIAITEM is not null and ZVCARDSTRING is not a vcard (starts with BEGIN:)
 	String media_name; // ZVCARDNAME if vcard in ZWAMEDIAITEM, ZSUMMARY in ZWAMESSAGEDATAITEM if record exists
 	String data; // ZVCARDSTRING in ZWAMEDIAITEM if ZMEDIAITEM is not null and ZVCARDSTRING starts with BEGIN:, otherwise ZTEXT
-	int media_wa_type; // audio: 2, contact: 4, image: 1, location: 5(no specimen now), system: 7(???), undefined: 0, video: 3
+	int media_wa_type; // audio: 2, contact: 4, image: 1, location: 5(no specimen now), system: 7(???), undefined: 0, video: 3, document: 9
 	int media_duration; // ZMOVIEDURATION
 	//byte[] media_hash; // doesn't matter
 	//String media_name; // null for some reason
