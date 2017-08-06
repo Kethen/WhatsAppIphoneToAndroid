@@ -146,8 +146,8 @@ implements Serializable {
         testread.file = new File("Media/From Iphone/0.jpg");
         testread.fileSize = 999;
         testread.suspiciousContent = 0;
-        testread.faceX = -1;
-        testread.faceY = -1;
+        testread.faceX = -1; // 0 for videos
+        testread.faceY = -1; // 0 for videos
         testread.mediaKey = new byte[3];
         Arrays.fill(testread.mediaKey, (byte) 'A');
         testread.refKey = new byte[3];

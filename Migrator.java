@@ -239,7 +239,7 @@ public class Migrator{
 				int mediaDuration = 0;
 				byte[] thumbImage = null;
 				int mediaWaType = result.getInt("ZMESSAGETYPE");
-				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 8){
+				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
 					String mediaMimeType = null;
 					float longitude = 0;
 					float latitude = 0;
@@ -318,8 +318,13 @@ public class Migrator{
 								}
 								crafted.fileSize = result2.getInt("ZFILESIZE");
 								crafted.suspiciousContent = 0;
-								crafted.faceX = -1;
-								crafted.faceY = -1;
+								if(mediaWaType == 3){
+									crafted.faceX = 0;
+									crafted.faceY = 0;
+								}else{
+									crafted.faceX = -1;
+									crafted.faceY = -1;
+								}
 								crafted.mediaKey = new byte[3];
 								Arrays.fill(crafted.mediaKey, (byte) 'A');
 								crafted.refKey = new byte[3];
@@ -347,9 +352,16 @@ public class Migrator{
 								// media is a document
 								if(mediaWaType == 8){
 									mediaWaType = 9;
+									String fileName = result.getString("ZTEXT");
+									if(fileName != null){
+										String[] splitted;
+										splitted = fileName.split("\\.");
+										mediaName = fileName;
+										mediaCaption = splitted[0];
+									}
 								}
 								// media is an audio
-								/*if(vcardString != null && vcardString.indexOf("audio") == 0){
+								else if(vcardString != null && vcardString.indexOf("audio") == 0){
 									mediaWaType = 2;
 								}
 								// media is a video
@@ -358,12 +370,8 @@ public class Migrator{
 								}
 								// media is an image
 								else if(vcardString != null && vcardString.indexOf("image") == 0){
-									mediaWaType = 4;
+									mediaWaType = 1;
 								}
-								// media is a location
-								
-								// stub not sure what location looks like in iphone database
-								*/
 							}
 						}
 					}
@@ -397,15 +405,15 @@ public class Migrator{
 		}
 		return true;
 	}
-	boolean standardFlow(String iphoneDb, String androidDb, String iphoneFolder, String androidFolder){
-		return loadIphoneDb(iphoneDb) && /*createAndroidDb(androidDb)*/ loadAndroidDb("template.db", androidDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
+	boolean standardFlow(String iphoneDb, String iphoneFolder, String androidFolder){
+		return loadIphoneDb(iphoneDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && /*createAndroidDb(androidDb)*/ loadAndroidDb("template.db", androidFolder + "WhatsApp/Databases/msgstore.db") && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
-		if(param.length != 4){
-			System.out.println("Usage: java -classpath sqlite.jar Migrator <iphone database path> <android database output> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
+		if(param.length != 3){
+			System.out.println("Usage: java -classpath sqlite.jar Migrator <iphone database> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
 			return;
 		}
 		Migrator instance = new Migrator();
-		instance.standardFlow(param[0], param[1], param[2], param[3]);
+		instance.standardFlow(param[0], param[1], param[2]);
 	}
 }
