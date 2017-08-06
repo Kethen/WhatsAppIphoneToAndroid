@@ -14,7 +14,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	//int key_id; // nullable
 	int status; // 0 receive 13 sent
 	int needs_push; // 0
-	int timestamp; // ZMESSAGEDATE, Android: Millisecond Unix, iPhone: NSDate=Unix - 978307200
+	long timestamp; // ZMESSAGEDATE, Android: Millisecond Unix, iPhone: NSDate=Unix - 978307200
 	String media_caption; // ZTITLE in ZWAMEDIAITEM if ZMEDIAITEM is not null, ZTITLE in ZWAMESSAGEDATAITEM if record exists
 	//String media_url; // ZMEDIAURL in in ZWAMEDIAITEM if ZMEDIAITEM is not null
 	String media_mime_type; // ZVCARDSTRING in ZWAMEDIAITEM if ZMEDIAITEM is not null and ZVCARDSTRING is not a vcard (starts with BEGIN:)
@@ -29,7 +29,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	float longitude;
 	float latitude;
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude){
+	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		this.id = id;
@@ -58,7 +58,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			sql.setInt(1, id);
 			sql.setString(2, key_remote_jid);
 			sql.setInt(3, key_from_me);
-			sql.setInt(4, timestamp);
+			sql.setLong(4, timestamp);
 			if(media_caption == null){
 				sql.setNull(5, Types.VARCHAR);
 			}else{
@@ -109,6 +109,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			System.out.println("failed to inject message " + id);
 			System.out.println(ex.getMessage());
 			ex.printStackTrace();
+			return false;
 		}
 		return true;
 	}

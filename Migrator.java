@@ -30,13 +30,30 @@ public class Migrator{
 		}
 		return true;
 	}
-	boolean loadAndroidDb(String path){
+	boolean loadAndroidDb(String path, String path2){
 		try{
-			android = DriverManager.getConnection("jdbc:sqlite:" + path);
+			File check = new File(path2);
+			if(check.exists()){
+				System.out.println("database file " + path2 + " exists!");
+				return false;
+			}
+			FileInputStream dbtemplate = new FileInputStream(path);
+			FileOutputStream newdb = new FileOutputStream(path2);
+			BufferedInputStream bufferedInFile = new BufferedInputStream(dbtemplate);
+			BufferedOutputStream bufferedOutFile = new BufferedOutputStream(newdb);
+			byte[] buffer = new byte[1024];
+			int readSize = bufferedInFile.read(buffer, 0, 1024);
+			while(readSize != -1){
+				bufferedOutFile.write(buffer, 0, readSize);
+				readSize = bufferedInFile.read(buffer, 0, 1024);
+			}
+			bufferedOutFile.close();
+			android = DriverManager.getConnection("jdbc:sqlite:" + path2);
 			if(android == null){
 				System.out.println("failed opening android database");
 				return false;
 			}
+			
 		}catch(Exception ex){
 			System.out.println("failed opening android database");
 			System.out.println(ex.getMessage());
@@ -142,7 +159,7 @@ public class Migrator{
 					subject = result.getString("ZPARTNERNAME");
 				}
 				int archived = result.getInt("ZARCHIVED");
-				int timestamp = (int) Math.floor(1000 * (result.getFloat("ZLASTMESSAGEDATE") + 978307200));
+				long timestamp = (long) Math.floor(1000 * (result.getFloat("ZLASTMESSAGEDATE") + 978307200));
 				int lastmsg = result.getInt("ZLASTMESSAGE");
 				ChatListItem row = new ChatListItem(jid, subject, archived, timestamp, lastmsg);
 				if(!row.injectAndroid(android)){
@@ -181,7 +198,7 @@ public class Migrator{
 					result2.close();
 					sql2.close();
 				}
-				int msgDate = (int)Math.floor(1000 * (result.getFloat("ZMESSAGEDATE") + 978307200));
+				long msgDate = (long)Math.floor(1000 * (result.getFloat("ZMESSAGEDATE") + 978307200));
 				int fromMe = result.getInt("ZISFROMME");
 				String jid;
 				if(fromMe == 1){
@@ -250,9 +267,9 @@ public class Migrator{
 									return false;
 								}
 								fileExtension = splitted[splitted.length - 1];
+								/*temp disabled file copy
 								FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
 								FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
-								
 								BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
 								BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
 								byte[] copyBuffer = new byte[1024];
@@ -263,6 +280,7 @@ public class Migrator{
 								}
 								bufferedInFile.close();
 								bufferedOutFile.close();
+								*/
 							}
 							// craft a com.whatsapp.MediaData object
 							MediaData crafted = new MediaData();
@@ -345,7 +363,7 @@ public class Migrator{
 		return true;
 	}
 	boolean standardFlow(String iphoneDb, String androidDb, String iphoneFolder, String androidFolder){
-		return loadIphoneDb(iphoneDb) && createAndroidDb(androidDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
+		return loadIphoneDb(iphoneDb) && /*createAndroidDb(androidDb) */ loadAndroidDb("msgstore.db", androidDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
 		if(param.length != 4){
