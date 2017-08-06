@@ -148,10 +148,18 @@ public class Migrator{
 			return false;
 		}
 		// first work with chat list
-		try{
+		try{	
 			Statement sql = iphone.createStatement();
-			ResultSet result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO, ZLASTMESSAGE FROM ZWACHATSESSION");
+			ResultSet result = sql.executeQuery("SELECT COUNT(Z_PK) AS number FROM ZWACHATSESSION");
+			result.next();
+			int numberOfSessions = result.getInt("number");
+			result.close();
+			sql.close();
+			sql = iphone.createStatement();
+			result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO, ZLASTMESSAGE FROM ZWACHATSESSION");
+			int current = 0;
 			//String key_remote_jid, String subject, int archived, int sort_timestamp
+			System.out.println("begin chatlist migration");
 			while(result.next()){
 				String jid = result.getString("ZCONTACTJID");
 				String subject = null;
@@ -166,7 +174,11 @@ public class Migrator{
 					System.out.println("insert chatlist failed");
 					return false;
 				}
+				current++;
+				System.out.print("\r");
+				System.out.print("chat sessions added: " + current + "/" + numberOfSessions);
 			}
+			System.out.println("");
 			result.close();
 			sql.close();
 		}catch(Exception ex){
@@ -178,9 +190,17 @@ public class Migrator{
 		// then work with messages
 		try{
 			Statement sql = iphone.createStatement();
-			ResultSet result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE FROM ZWAMESSAGE");
+			ResultSet result = sql.executeQuery("SELECT COUNT(Z_PK) as number FROM ZWAMESSAGE");
+			result.next();
+			int numberOfMessage = result.getInt("number");
+			result.close();
+			sql.close();
+			sql = iphone.createStatement();
+			result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE FROM ZWAMESSAGE");
 			// file counter
 			int fileCount = 0;
+			int current = 0;
+			System.out.println("begin message migration");
 			while(result.next()){
 				// common items
 				int id = result.getInt("Z_PK");
@@ -349,7 +369,11 @@ public class Migrator{
 					System.out.println("insert message failed");
 					return false;
 				}
+				current++;
+				System.out.print("\r");
+				System.out.print("messages added: " + current + "/" + numberOfMessage);
 			}
+			System.out.println("");
 			result.close();
 			sql.close();
 		}catch(Exception ex){
@@ -361,7 +385,7 @@ public class Migrator{
 		return true;
 	}
 	boolean standardFlow(String iphoneDb, String androidDb, String iphoneFolder, String androidFolder){
-		return loadIphoneDb(iphoneDb) && createAndroidDb(androidDb) /* loadAndroidDb("msgstore.db", androidDb) */ && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
+		return loadIphoneDb(iphoneDb) && /*createAndroidDb(androidDb)*/ loadAndroidDb("template.db", androidDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
 		if(param.length != 4){
