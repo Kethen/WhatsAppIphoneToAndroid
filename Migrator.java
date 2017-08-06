@@ -133,7 +133,7 @@ public class Migrator{
 		// first work with chat list
 		try{
 			Statement sql = iphone.createStatement();
-			ResultSet result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO FROM ZWACHATSESSION");
+			ResultSet result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO, ZLASTMESSAGE FROM ZWACHATSESSION");
 			//String key_remote_jid, String subject, int archived, int sort_timestamp
 			while(result.next()){
 				String jid = result.getString("ZCONTACTJID");
@@ -142,8 +142,9 @@ public class Migrator{
 					subject = result.getString("ZPARTNERNAME");
 				}
 				int archived = result.getInt("ZARCHIVED");
-				int timestamp = (int) Math.floor(1000 * (result.getFloat("ZLASTMESSAGEDATE") + 978307200)) ;
-				ChatListItem row = new ChatListItem(jid, subject, archived, timestamp);
+				int timestamp = (int) Math.floor(1000 * (result.getFloat("ZLASTMESSAGEDATE") + 978307200));
+				int lastmsg = result.getInt("ZLASTMESSAGE");
+				ChatListItem row = new ChatListItem(jid, subject, archived, timestamp, lastmsg);
 				if(!row.injectAndroid(android)){
 					System.out.println("insert chatlist failed");
 					return false;
@@ -160,7 +161,7 @@ public class Migrator{
 		// then work with messages
 		try{
 			Statement sql = iphone.createStatement();
-			ResultSet result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK FROM ZWAMESSAGE");
+			ResultSet result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE FROM ZWAMESSAGE");
 			// file counter
 			int fileCount = 0;
 			while(result.next()){
@@ -193,9 +194,10 @@ public class Migrator{
 				String mediaName = null;
 				int mediaDuration = 0;
 				byte[] thumbImage = null;
-				int mediaWaType = 0;
+				int mediaWaType = result.getInt("ZMESSAGETYPE");
 				String mediaMimeType = null;
-				// the sent message is a link
+				float longitude = 0;
+				float latitude = 0;
 				int mediaItemId = result.getInt("ZMEDIAITEM");
 				sql2 = iphone.prepareStatement("SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?");
 				sql2.setInt(1, result.getInt("Z_PK"));
@@ -218,11 +220,19 @@ public class Migrator{
 					result2 = sql2.executeQuery();
 					if(result2.next()){
 						String vcardString = result2.getString("ZVCARDSTRING");
+						String localMediaPath = result2.getString("ZMEDIALOCALPATH");
 						// the media is a vcard
-						if(vcardString.indexOf("BEGIN:") == 0){
+						if(mediaWaType == 4){
 							data = vcardString;
 							mediaName = result2.getString("ZVCARDNAME");
-							mediaWaType = 4;
+							//mediaWaType = 4;
+						}
+						// the media is a location
+						else if(mediaWaType == 5){
+							// stub ish, not enough iphone location sample
+							data = result.getString("ZTEXT");
+							longitude = result2.getFloat("ZLONGITUDE");
+							latitude = result2.getFloat("ZLATITUDE");
 						}
 						// the media is a media
 						else{
@@ -231,32 +241,37 @@ public class Migrator{
 							mediaCaption = result2.getString("ZTITLE");
 							mediaDuration = result2.getInt("ZMOVIEDURATION");
 							// copy the file
-							String localMediaPath = result2.getString("ZMEDIALOCALPATH");
-							String[] splitted = localMediaPath.split("\\.");
-							if(splitted.length == 0){
-								System.out.println("sum ting wong with ZMEDIALOCALPATH");
-								System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
-								return false;
+							String fileExtension = null;
+							if(localMediaPath != null){
+								String[] splitted = localMediaPath.split("\\.");
+								if(splitted.length == 0){
+									System.out.println("sum ting wong with ZMEDIALOCALPATH");
+									System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
+									return false;
+								}
+								fileExtension = splitted[splitted.length - 1];
+								FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
+								FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
+								
+								BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
+								BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+								byte[] copyBuffer = new byte[1024];
+								int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+								while(readSize != -1){
+									bufferedOutFile.write(copyBuffer, 0, readSize);
+									readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+								}
+								bufferedInFile.close();
+								bufferedOutFile.close();
 							}
-							String fileExtension = splitted[splitted.length - 1];
-							FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
-							FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
-							
-							BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
-							BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
-							byte[] copyBuffer = new byte[1024];
-							int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-							while(readSize != -1){
-								bufferedOutFile.write(copyBuffer, 0, readSize);
-								System.out.println("debug");
-								readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-							}
-							bufferedInFile.close();
-							bufferedOutFile.close();
 							// craft a com.whatsapp.MediaData object
 							MediaData crafted = new MediaData();
 							crafted.transferred = true;
-							crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+							if(localMediaPath == null){
+								crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+							}else{
+								crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
+							}
 							crafted.fileSize = result2.getInt("ZFILESIZE");
 							crafted.suspiciousContent = 0;
 							crafted.faceX = -1;
@@ -276,7 +291,7 @@ public class Migrator{
 							crafted.height = result2.getInt("ZLATITUDE");
 							crafted.doodleId = "Does it really matter?";
 							crafted.gifAttribution = 0;
-							crafted.thumbnailHeightWidthRatio = crafted.width / crafted.height;
+							crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
 							crafted.uploadRetry = false;
 							fileCount++;
 							// serialize the object
@@ -286,19 +301,21 @@ public class Migrator{
 							objectOutput.close();
 							thumbImage = craftedBuffer.toByteArray();
 							// media is an audio
-							if(vcardString.indexOf("audio") == 0){
+							/*if(vcardString != null && vcardString.indexOf("audio") == 0){
 								mediaWaType = 2;
 							}
 							// media is a video
-							else if(vcardString.indexOf("video") == 0){
+							else if(vcardString != null && vcardString.indexOf("video") == 0){
 								mediaWaType = 3;
 							}
 							// media is an image
-							else if(vcardString.indexOf("image") == 0){
+							else if(vcardString != null && vcardString.indexOf("image") == 0){
 								mediaWaType = 4;
 							}
 							// media is a location
+							
 							// stub not sure what location looks like in iphone database
+							*/
 						}
 					}
 				}
@@ -310,7 +327,7 @@ public class Migrator{
 				}
 				// write the item into the android database
 				//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
-				MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage);
+				MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude);
 				
 				if(!message.injectAndroid(android)){
 					System.out.println("insert message failed");

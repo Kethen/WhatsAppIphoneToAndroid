@@ -26,8 +26,10 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	//String media_name; // null for some reason
 	String remote_resource; // ZGROUPMEMBER not null -> ZWAGROUPMEMBER -> ZMEMBERJID
 	byte[] thumb_image; // serialized java data, com.whatsapp.MediaDat
+	float longitude;
+	float latitude;
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image){
+	public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		this.id = id;
@@ -42,6 +44,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.media_duration = media_duration;
 		this.remote_resource = remote_resource;
 		this.thumb_image = thumb_image;
+		this.longitude = longitude;
+		this.latitude = latitude;
 	}
 	public boolean injectAndroid(Connection android){
 		try{
@@ -50,7 +54,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				link = true;
 				media_wa_type = 0;
 			}
-			PreparedStatement sql = android.prepareStatement("INSERT INTO messages(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			PreparedStatement sql = android.prepareStatement("INSERT INTO messages(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			sql.setInt(1, id);
 			sql.setString(2, key_remote_jid);
 			sql.setInt(3, key_from_me);
@@ -85,11 +89,13 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			if(thumb_image == null){
 				sql.setNull(12, Types.BLOB);
 			}else{
-				sql.setBlob(12, new ByteArrayInputStream(thumb_image));
+				sql.setBytes(12, thumb_image);
 			}
 			sql.setInt(13, needs_push);
 			sql.setInt(14, status);
 			sql.setString(15, id + "");
+			sql.setFloat(16, longitude);
+			sql.setFloat(17, latitude);
 			sql.execute();
 			sql.close();
 			if(link){
