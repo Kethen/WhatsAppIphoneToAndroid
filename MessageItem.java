@@ -1,3 +1,5 @@
+// created by Katharine Chui
+// https://github.com/Kethen
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -9,6 +11,7 @@ import java.io.*;
 
 public class MessageItem{ // messages <- ZWAMESSAGE
 	int id; // _id <- Z_PK
+	String key_id;
 	String key_remote_jid; // ZTOJID, if null ZFROMJID
 	int key_from_me; // ZISFROMME
 	//int key_id; // nullable
@@ -29,7 +32,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	float longitude;
 	float latitude;
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude){
+	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		this.id = id;
@@ -46,6 +49,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.thumb_image = thumb_image;
 		this.longitude = longitude;
 		this.latitude = latitude;
+		this.key_id = key_id;
 	}
 	public boolean injectAndroid(Connection android){
 		try{
@@ -93,7 +97,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			}
 			sql.setInt(13, needs_push);
 			sql.setInt(14, status);
-			sql.setString(15, id + "");
+			sql.setString(15, key_id);
 			sql.setFloat(16, longitude);
 			sql.setFloat(17, latitude);
 			sql.execute();

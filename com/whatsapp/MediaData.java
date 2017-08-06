@@ -1,3 +1,5 @@
+// created by Katharine Chui
+// https://github.com/Kethen
 package com.whatsapp;
 
 import java.io.File;

@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Created-By: Bundle
+Class-Path: sqlite.jar
+Main-Class: Migrator

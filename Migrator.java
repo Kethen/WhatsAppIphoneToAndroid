@@ -1,3 +1,5 @@
+// created by Katharine Chui
+// https://github.com/Kethen
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -122,14 +124,24 @@ public class Migrator{
 				System.out.println("database file " + path + " exists!");
 				return false;
 			}
+			InputStream dbTemplate = this.getClass().getClassLoader().getResourceAsStream("template.db");
+			FileOutputStream outFile = new FileOutputStream(path);
+			BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+			byte[] copyBuffer = new byte[1024];
+			int readSize = dbTemplate.read(copyBuffer, 0, 1024);
+			while(readSize != -1){
+				bufferedOutFile.write(copyBuffer, 0, readSize);
+				readSize = dbTemplate.read(copyBuffer, 0, readSize);
+			}
+			bufferedOutFile.close();
 			android = DriverManager.getConnection("jdbc:sqlite:" + path);
-			Statement sql = android.createStatement();
+			/*Statement sql = android.createStatement();
 			String newdbstring = "CREATE TABLE messages (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT NOT NULL, key_from_me INTEGER, key_id TEXT NOT NULL, status INTEGER, needs_push INTEGER, data TEXT, timestamp INTEGER, media_url TEXT, media_mime_type TEXT, media_wa_type TEXT, media_size INTEGER, media_name TEXT, media_caption TEXT, media_hash TEXT, media_duration INTEGER, origin INTEGER, latitude REAL, longitude REAL, thumb_image TEXT, remote_resource TEXT, received_timestamp INTEGER, send_timestamp INTEGER, receipt_server_timestamp INTEGER, receipt_device_timestamp INTEGER, read_device_timestamp INTEGER, played_device_timestamp INTEGER, raw_data BLOB, recipient_count INTEGER, participant_hash TEXT, starred INTEGER, quoted_row_id INTEGER, mentioned_jids TEXT, multicast_id TEXT, edit_version INTEGER, media_enc_hash TEXT); CREATE UNIQUE INDEX messages_key_index on messages (key_remote_jid, key_from_me, key_id); CREATE INDEX messages_jid_id_index on messages (key_remote_jid, _id); CREATE INDEX media_hash_index on messages (media_hash); CREATE INDEX media_type_index on messages (media_wa_type); CREATE INDEX media_type_jid_index on messages (key_remote_jid, media_wa_type); CREATE INDEX starred_index on messages (starred); CREATE TABLE chat_list (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT UNIQUE, message_table_id INTEGER, subject TEXT, creation INTEGER, last_read_message_table_id INTEGER, last_read_receipt_sent_message_table_id INTEGER, archived INTEGER, sort_timestamp INTEGER, mod_tag INTEGER, gen REAL, my_messages INTEGER, plaintext_disabled BOOLEAN, last_message_table_id INTEGER, unseen_message_count INTEGER, unseen_missed_calls_count INTEGER, unseen_row_count INTEGER, vcard_ui_dismissed INTEGER); CREATE TABLE props (_id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, value TEXT); CREATE TABLE 'messages_fts_content'(docid INTEGER PRIMARY KEY, 'c0content'); CREATE TABLE 'messages_fts_segments'(blockid INTEGER PRIMARY KEY, block BLOB); CREATE TABLE 'messages_fts_segdir'(level INTEGER,idx INTEGER,start_block INTEGER,leaves_end_block INTEGER,end_block INTEGER,root BLOB,PRIMARY KEY(level, idx)); CREATE TABLE messages_quotes (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT NOT NULL, key_from_me INTEGER, key_id TEXT NOT NULL, status INTEGER, needs_push INTEGER, data TEXT, timestamp INTEGER, media_url TEXT, media_mime_type TEXT, media_wa_type TEXT, media_size INTEGER, media_name TEXT, media_caption TEXT, media_hash TEXT, media_duration INTEGER, origin INTEGER, latitude REAL, longitude REAL, thumb_image TEXT, remote_resource TEXT, received_timestamp INTEGER, send_timestamp INTEGER, receipt_server_timestamp INTEGER, receipt_device_timestamp INTEGER, read_device_timestamp INTEGER, played_device_timestamp INTEGER, raw_data BLOB, recipient_count INTEGER, participant_hash TEXT, starred INTEGER, quoted_row_id INTEGER, mentioned_jids TEXT, multicast_id TEXT, edit_version INTEGER, media_enc_hash TEXT); CREATE TABLE messages_vcards (_id INTEGER PRIMARY KEY AUTOINCREMENT, message_row_id INTEGER, sender_jid TEXT, vcard TEXT); CREATE TABLE messages_vcards_jids (_id INTEGER PRIMARY KEY AUTOINCREMENT, message_row_id INTEGER, vcard_jid TEXT, vcard_row_id INTEGER); CREATE TABLE messages_edits (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT NOT NULL, key_from_me INTEGER, key_id TEXT NOT NULL, status INTEGER, needs_push INTEGER, data TEXT, timestamp INTEGER, media_url TEXT, media_mime_type TEXT, media_wa_type TEXT, media_size INTEGER, media_name TEXT, media_caption TEXT, media_hash TEXT, media_duration INTEGER, origin INTEGER, latitude REAL, longitude REAL, thumb_image TEXT, remote_resource TEXT, received_timestamp INTEGER, send_timestamp INTEGER, receipt_server_timestamp INTEGER, receipt_device_timestamp INTEGER, read_device_timestamp INTEGER, played_device_timestamp INTEGER, raw_data BLOB, recipient_count INTEGER, participant_hash TEXT, starred INTEGER, quoted_row_id INTEGER, mentioned_jids TEXT, multicast_id TEXT, edit_version INTEGER, media_enc_hash TEXT); CREATE TABLE messages_links (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT, message_row_id INTEGER, link_index INTEGER); CREATE TABLE frequents (_id INTEGER PRIMARY KEY AUTOINCREMENT, jid TEXT NOT NULL, type INTEGER NOT NULL, message_count INTEGER NOT NULL); CREATE TABLE receipts (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT NOT NULL, key_id TEXT NOT NULL, remote_resource TEXT, receipt_device_timestamp INTEGER, read_device_timestamp INTEGER, played_device_timestamp INTEGER); CREATE INDEX receipts_key_index on receipts (key_remote_jid, key_id); CREATE TABLE group_participants (_id INTEGER PRIMARY KEY AUTOINCREMENT, gjid TEXT NOT NULL, jid TEXT NOT NULL, admin INTEGER, pending INTEGER, sent_sender_key INTEGER); CREATE UNIQUE INDEX group_participants_index on group_participants (gjid, jid); CREATE TABLE group_participants_history (_id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp DATETIME NOT NULL, gjid TEXT NOT NULL, jid TEXT NOT NULL, action INTEGER NOT NULL, old_phash TEXT NOT NULL, new_phash TEXT NOT NULL); CREATE INDEX group_participants_history_index on group_participants_history (gjid); CREATE TABLE media_refs (_id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT UNIQUE, ref_count INTEGER); CREATE TABLE media_streaming_sidecar (_id INTEGER PRIMARY KEY AUTOINCREMENT, sidecar BLOB, timestamp DATETIME, key_remote_jid TEXT NOT NULL, key_from_me INTEGER, key_id TEXT NOT NULL); CREATE TABLE message_thumbnails (thumbnail BLOB, timestamp DATETIME, key_remote_jid TEXT NOT NULL, key_from_me INTEGER, key_id TEXT NOT NULL); CREATE UNIQUE INDEX messages_thumbnail_key_index on message_thumbnails (key_remote_jid, key_from_me, key_id); CREATE TABLE status_list (_id INTEGER PRIMARY KEY AUTOINCREMENT, key_remote_jid TEXT UNIQUE, message_table_id INTEGER, last_read_message_table_id INTEGER, last_read_receipt_sent_message_table_id INTEGER, first_unread_message_table_id INTEGER, autodownload_limit_message_table_id INTEGER, timestamp INTEGER, unseen_count INTEGER, total_count INTEGER); CREATE TABLE conversion_tuples (key_remote_jid TEXT PRIMARY KEY, data TEXT, source TEXT, last_interaction INTEGER, first_interaction INTEGER NOT NULL);";
 			String[] splitted = newdbstring.split(";");
 			for(int i = 0;i < splitted.length;i++){
 				sql.execute(splitted[i]);
 			}
-			sql.close();
+			sql.close();*/
 		}catch(Exception ex){
 			System.out.println("create database failed!");
 			System.out.println(ex.getMessage());
@@ -203,7 +215,7 @@ public class Migrator{
 			result.close();
 			sql.close();
 			sql = iphone.createStatement();
-			result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE FROM ZWAMESSAGE");
+			result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE, ZSTANZAID FROM ZWAMESSAGE");
 			// file counter
 			int fileCount = 0;
 			int current = 0;
@@ -233,6 +245,7 @@ public class Migrator{
 				}else{
 					jid = result.getString("ZFROMJID");
 				}
+				String keyId = result.getString("ZSTANZAID");
 				String data = null;
 				String mediaCaption = null;
 				String mediaName = null;
@@ -255,6 +268,15 @@ public class Migrator{
 						result2.close();
 						sql2.close();
 						mediaWaType = -1; // actually for injecting
+					}
+					// the sent message is just a text message
+					else if(mediaWaType == 0){
+						result2.close();
+						sql2.close();
+						data = result.getString("ZTEXT");
+						// potentially use plist here to parse messages_quotes
+						// not sure if it's that important tho quotes are repeated messages...
+						// need to figure out how quotes work in android first
 					}
 					// the sent message is a media
 					else if(mediaItemId != 0){
@@ -353,11 +375,15 @@ public class Migrator{
 								if(mediaWaType == 8){
 									mediaWaType = 9;
 									String fileName = result.getString("ZTEXT");
+									mediaName = fileName;
 									if(fileName != null){
 										String[] splitted;
 										splitted = fileName.split("\\.");
-										mediaName = fileName;
-										mediaCaption = splitted[0];
+										if(splitted.length > 1){
+											mediaCaption = fileName.substring(0, fileName.length() - splitted[splitted.length - 1].length() - 1);
+										}else{
+											mediaCaption = fileName;
+										}
 									}
 								}
 								// media is an audio
@@ -375,15 +401,9 @@ public class Migrator{
 							}
 						}
 					}
-					// the sent message is just a text message
-					else{
-						result2.close();
-						sql2.close();
-						data = result.getString("ZTEXT");
-					}
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
-					MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude);
+					MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
 					
 					if(!message.injectAndroid(android)){
 						System.out.println("insert message failed");
@@ -406,11 +426,11 @@ public class Migrator{
 		return true;
 	}
 	boolean standardFlow(String iphoneDb, String iphoneFolder, String androidFolder){
-		return loadIphoneDb(iphoneDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && /*createAndroidDb(androidDb)*/ loadAndroidDb("template.db", androidFolder + "WhatsApp/Databases/msgstore.db") && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
+		return loadIphoneDb(iphoneDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && createAndroidDb(androidFolder + "WhatsApp/Databases/msgstore.db") /*loadAndroidDb("template.db", androidFolder + "WhatsApp/Databases/msgstore.db")*/ && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
 		if(param.length != 3){
-			System.out.println("Usage: java -classpath sqlite.jar Migrator <iphone database> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
+			System.out.println("Usage: java -jar whatsappi2a.jar <iphone database> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
 			return;
 		}
 		Migrator instance = new Migrator();
