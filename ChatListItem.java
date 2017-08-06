@@ -43,7 +43,7 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 			}
 			result.close();
 			sql.close();
-			PreparedStatement newRow = android.prepareStatement("INSERT INTO chat_list(key_remote_jid, subject, creation, archived, sort_timestamp, my_messages, plaintext_disabled, last_message_table_id, last_read_message_table_id, last_read_receipt_sent_message_table_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			PreparedStatement newRow = android.prepareStatement("INSERT INTO chat_list(key_remote_jid, subject, creation, archived, sort_timestamp, my_messages, plaintext_disabled, last_message_table_id, last_read_message_table_id, last_read_receipt_sent_message_table_id, message_table_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			newRow.setString(1, key_remote_jid);
 			if(subject == null){
 				newRow.setNull(2, java.sql.Types.VARCHAR);
@@ -59,10 +59,12 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 				newRow.setNull(8, Types.INTEGER);
 				newRow.setNull(9, Types.INTEGER);
 				newRow.setNull(10, Types.INTEGER);
+				newRow.setNull(11, Types.INTEGER);
 			}else{
 				newRow.setInt(8, last_message_table_id);
 				newRow.setInt(9, last_message_table_id);
 				newRow.setInt(10, last_message_table_id);
+				newRow.setInt(11, last_message_table_id);
 			}
 			newRow.execute();
 			newRow.close();

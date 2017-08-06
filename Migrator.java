@@ -174,7 +174,7 @@ public class Migrator{
 			System.out.println("begin chatlist migration");
 			while(result.next()){
 				String jid = result.getString("ZCONTACTJID");
-				PreparedStatement sql2 = iphone.prepareStatement("SELECT COUNT(Z_PK) AS number FROM ZWAMESSAGE WHERE ZFROMJID = ? OR ZTOJID = ?");
+				PreparedStatement sql2 = iphone.prepareStatement("SELECT COUNT(Z_PK) AS number FROM ZWAMESSAGE WHERE (ZFROMJID = ? OR ZTOJID = ?) AND (ZMESSAGETYPE = 0 OR ZMESSAGETYPE = 1 OR ZMESSAGETYPE = 2 OR ZMESSAGETYPE = 3 OR ZMESSAGETYPE = 4 OR ZMESSAGETYPE = 5 OR ZMESSAGETYPE = 8)");
 				sql2.setString(1, jid);
 				sql2.setString(2, jid);
 				ResultSet result2 = sql2.executeQuery();
