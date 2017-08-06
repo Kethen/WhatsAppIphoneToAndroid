@@ -267,7 +267,6 @@ public class Migrator{
 									return false;
 								}
 								fileExtension = splitted[splitted.length - 1];
-								/*temp disabled file copy
 								FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
 								FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
 								BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
@@ -280,12 +279,11 @@ public class Migrator{
 								}
 								bufferedInFile.close();
 								bufferedOutFile.close();
-								*/
 							}
 							// craft a com.whatsapp.MediaData object
 							MediaData crafted = new MediaData();
 							crafted.transferred = true;
-							if(localMediaPath == null){
+							if(localMediaPath != null){
 								crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
 							}else{
 								crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
@@ -363,7 +361,7 @@ public class Migrator{
 		return true;
 	}
 	boolean standardFlow(String iphoneDb, String androidDb, String iphoneFolder, String androidFolder){
-		return loadIphoneDb(iphoneDb) && /*createAndroidDb(androidDb) */ loadAndroidDb("msgstore.db", androidDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
+		return loadIphoneDb(iphoneDb) && createAndroidDb(androidDb) /* loadAndroidDb("msgstore.db", androidDb) */ && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
 		if(param.length != 4){
