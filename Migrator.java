@@ -274,9 +274,26 @@ public class Migrator{
 						result2.close();
 						sql2.close();
 						data = result.getString("ZTEXT");
-						// potentially use plist here to parse messages_quotes
-						// not sure if it's that important tho quotes are repeated messages...
-						// need to figure out how quotes work in android first
+						// property list reading:
+						// 1. check if we have a ZMEDIAITEM
+						// 2. obtain record with Z_PK in ZWAMEDIAITEM
+						// 3. obtain ZMETADATA, check null
+						// 4. traverse to the first dict element
+						// 5. traverse to the first array element
+						// 6. traverse to the first dict element
+						// 7. traverse through the key elements, check UID element after mentions and quotedMessageData
+						// 8. if UID after mentions is not 0
+						// 8.1 leave the dict element
+						// 8.2 ignore 1 string element
+						// 8.3 ignore 1 dict element
+						// 8.4 collect all incoming string elements
+						// 8.5 set mentioned_jids accordingly
+						// 9. if UID after quotedMessageData is not 0
+						// 9.1 leave the dict element
+						// 9.2 capture first string as the key_id of the message to be clone
+						// 9.3 clone the message to messages_quotes
+						// 9.4 obtain _id of the cloned message
+						// 9.5 set quoted_row_id to _id of the cloned message
 					}
 					// the sent message is a media
 					else if(mediaItemId != 0){

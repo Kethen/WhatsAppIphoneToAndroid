@@ -31,8 +31,10 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	byte[] thumb_image; // serialized java data, com.whatsapp.MediaDat
 	float longitude;
 	float latitude;
+	int quoted_row_id;
+	String mentioned_jids;
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id){
+	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, int quoted_row_id, String mentioned_jids){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		this.id = id;
@@ -50,15 +52,23 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.longitude = longitude;
 		this.latitude = latitude;
 		this.key_id = key_id;
+		this.quoted_row_id = quoted_row_id;
+		this.mentioned_jids = mentioned_jids;
 	}
-	public boolean injectAndroid(Connection android){
+	public boolean injectAndroid(Connection android, boolean quoted){
 		try{
 			boolean link = false;
 			if(media_wa_type == -1){
 				link = true;
 				media_wa_type = 0;
 			}
-			PreparedStatement sql = android.prepareStatement("INSERT INTO messages(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			String insertStatement;
+			if(!quoted){
+				insertStatement = "INSERT INTO messages(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude, quoted_row_id, mentioned_jids) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+			}else{
+				insertStatement = "INSERT INTO messages_quotes(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude, quoted_row_id, mentioned_jids) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+			}
+			PreparedStatement sql = android.prepareStatement(insertStatement);
 			sql.setInt(1, id);
 			sql.setString(2, key_remote_jid);
 			sql.setInt(3, key_from_me);
@@ -100,6 +110,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			sql.setString(15, key_id);
 			sql.setFloat(16, longitude);
 			sql.setFloat(17, latitude);
+			sql.setInt(18, quoted_row_id);
+			sql.setString(19, mentioned_jids);
 			sql.execute();
 			sql.close();
 			if(link){
@@ -110,7 +122,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				sql.close();
 			}
 		}catch(Exception ex){
-			System.out.println("failed to inject message " + id);
+			System.out.println("failed to inject message " + id + "\nquoted: " + quoted);
 			System.out.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;

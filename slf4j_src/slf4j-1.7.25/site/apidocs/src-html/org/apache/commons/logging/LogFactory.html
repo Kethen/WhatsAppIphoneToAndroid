@@ -1,0 +1,480 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/*<a name="line.1"></a>
+<span class="sourceLineNo">002</span> * Copyright 2001-2004 The Apache Software Foundation.<a name="line.2"></a>
+<span class="sourceLineNo">003</span> *<a name="line.3"></a>
+<span class="sourceLineNo">004</span> * Licensed under the Apache License, Version 2.0 (the "License");<a name="line.4"></a>
+<span class="sourceLineNo">005</span> * you may not use this file except in compliance with the License.<a name="line.5"></a>
+<span class="sourceLineNo">006</span> * You may obtain a copy of the License at<a name="line.6"></a>
+<span class="sourceLineNo">007</span> *<a name="line.7"></a>
+<span class="sourceLineNo">008</span> *      http://www.apache.org/licenses/LICENSE-2.0<a name="line.8"></a>
+<span class="sourceLineNo">009</span> *<a name="line.9"></a>
+<span class="sourceLineNo">010</span> * Unless required by applicable law or agreed to in writing, software<a name="line.10"></a>
+<span class="sourceLineNo">011</span> * distributed under the License is distributed on an "AS IS" BASIS,<a name="line.11"></a>
+<span class="sourceLineNo">012</span> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<a name="line.12"></a>
+<span class="sourceLineNo">013</span> * See the License for the specific language governing permissions and<a name="line.13"></a>
+<span class="sourceLineNo">014</span> * limitations under the License.<a name="line.14"></a>
+<span class="sourceLineNo">015</span> */<a name="line.15"></a>
+<span class="sourceLineNo">016</span><a name="line.16"></a>
+<span class="sourceLineNo">017</span>package org.apache.commons.logging;<a name="line.17"></a>
+<span class="sourceLineNo">018</span><a name="line.18"></a>
+<span class="sourceLineNo">019</span>import java.util.Hashtable;<a name="line.19"></a>
+<span class="sourceLineNo">020</span><a name="line.20"></a>
+<span class="sourceLineNo">021</span>import org.apache.commons.logging.impl.SLF4JLogFactory;<a name="line.21"></a>
+<span class="sourceLineNo">022</span><a name="line.22"></a>
+<span class="sourceLineNo">023</span>/**<a name="line.23"></a>
+<span class="sourceLineNo">024</span> * &lt;p&gt;<a name="line.24"></a>
+<span class="sourceLineNo">025</span> * Factory for creating {@link Log} instances, which always delegates to an<a name="line.25"></a>
+<span class="sourceLineNo">026</span> * instance of {@link SLF4JLogFactory}.<a name="line.26"></a>
+<span class="sourceLineNo">027</span> * <a name="line.27"></a>
+<span class="sourceLineNo">028</span> * &lt;/p&gt;<a name="line.28"></a>
+<span class="sourceLineNo">029</span> * <a name="line.29"></a>
+<span class="sourceLineNo">030</span> * @author Craig R. McClanahan<a name="line.30"></a>
+<span class="sourceLineNo">031</span> * @author Costin Manolache<a name="line.31"></a>
+<span class="sourceLineNo">032</span> * @author Richard A. Sitze<a name="line.32"></a>
+<span class="sourceLineNo">033</span> * @author Ceki G&amp;uuml;lc&amp;uuml;<a name="line.33"></a>
+<span class="sourceLineNo">034</span> */<a name="line.34"></a>
+<span class="sourceLineNo">035</span><a name="line.35"></a>
+<span class="sourceLineNo">036</span>@SuppressWarnings("rawtypes")<a name="line.36"></a>
+<span class="sourceLineNo">037</span>public abstract class LogFactory {<a name="line.37"></a>
+<span class="sourceLineNo">038</span><a name="line.38"></a>
+<span class="sourceLineNo">039</span>    static String UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J = "http://www.slf4j.org/codes.html#unsupported_operation_in_jcl_over_slf4j";<a name="line.39"></a>
+<span class="sourceLineNo">040</span><a name="line.40"></a>
+<span class="sourceLineNo">041</span>    static LogFactory logFactory = new SLF4JLogFactory();<a name="line.41"></a>
+<span class="sourceLineNo">042</span><a name="line.42"></a>
+<span class="sourceLineNo">043</span>    /**<a name="line.43"></a>
+<span class="sourceLineNo">044</span>     * The name (&lt;code&gt;priority&lt;/code&gt;) of the key in the config file used to<a name="line.44"></a>
+<span class="sourceLineNo">045</span>     * specify the priority of that particular config file. The associated value<a name="line.45"></a>
+<span class="sourceLineNo">046</span>     * is a floating-point number; higher values take priority over lower values.<a name="line.46"></a>
+<span class="sourceLineNo">047</span>     * <a name="line.47"></a>
+<span class="sourceLineNo">048</span>     * &lt;p&gt;<a name="line.48"></a>
+<span class="sourceLineNo">049</span>     * This property is not used but preserved here for compatibility.<a name="line.49"></a>
+<span class="sourceLineNo">050</span>     */<a name="line.50"></a>
+<span class="sourceLineNo">051</span>    public static final String PRIORITY_KEY = "priority";<a name="line.51"></a>
+<span class="sourceLineNo">052</span><a name="line.52"></a>
+<span class="sourceLineNo">053</span>    /**<a name="line.53"></a>
+<span class="sourceLineNo">054</span>     * The name (&lt;code&gt;use_tccl&lt;/code&gt;) of the key in the config file used to<a name="line.54"></a>
+<span class="sourceLineNo">055</span>     * specify whether logging classes should be loaded via the thread context<a name="line.55"></a>
+<span class="sourceLineNo">056</span>     * class loader (TCCL), or not. By default, the TCCL is used.<a name="line.56"></a>
+<span class="sourceLineNo">057</span>     * <a name="line.57"></a>
+<span class="sourceLineNo">058</span>     * &lt;p&gt;<a name="line.58"></a>
+<span class="sourceLineNo">059</span>     * This property is not used but preserved here for compatibility.<a name="line.59"></a>
+<span class="sourceLineNo">060</span>     */<a name="line.60"></a>
+<span class="sourceLineNo">061</span>    public static final String TCCL_KEY = "use_tccl";<a name="line.61"></a>
+<span class="sourceLineNo">062</span><a name="line.62"></a>
+<span class="sourceLineNo">063</span>    /**<a name="line.63"></a>
+<span class="sourceLineNo">064</span>     * The name of the property used to identify the LogFactory implementation<a name="line.64"></a>
+<span class="sourceLineNo">065</span>     * class name.<a name="line.65"></a>
+<span class="sourceLineNo">066</span>     * &lt;p&gt;<a name="line.66"></a>
+<span class="sourceLineNo">067</span>     * This property is not used but preserved here for compatibility.<a name="line.67"></a>
+<span class="sourceLineNo">068</span>     */<a name="line.68"></a>
+<span class="sourceLineNo">069</span>    public static final String FACTORY_PROPERTY = "org.apache.commons.logging.LogFactory";<a name="line.69"></a>
+<span class="sourceLineNo">070</span><a name="line.70"></a>
+<span class="sourceLineNo">071</span>    /**<a name="line.71"></a>
+<span class="sourceLineNo">072</span>     * The fully qualified class name of the fallback &lt;code&gt;LogFactory&lt;/code&gt;<a name="line.72"></a>
+<span class="sourceLineNo">073</span>     * implementation class to use, if no other can be found.<a name="line.73"></a>
+<span class="sourceLineNo">074</span>     * <a name="line.74"></a>
+<span class="sourceLineNo">075</span>     * &lt;p&gt;<a name="line.75"></a>
+<span class="sourceLineNo">076</span>     * This property is not used but preserved here for compatibility.<a name="line.76"></a>
+<span class="sourceLineNo">077</span>     */<a name="line.77"></a>
+<span class="sourceLineNo">078</span>    public static final String FACTORY_DEFAULT = "org.apache.commons.logging.impl.SLF4JLogFactory";<a name="line.78"></a>
+<span class="sourceLineNo">079</span><a name="line.79"></a>
+<span class="sourceLineNo">080</span>    /**<a name="line.80"></a>
+<span class="sourceLineNo">081</span>     * The name of the properties file to search for.<a name="line.81"></a>
+<span class="sourceLineNo">082</span>     * &lt;p&gt;<a name="line.82"></a>
+<span class="sourceLineNo">083</span>     * This property is not used but preserved here for compatibility.<a name="line.83"></a>
+<span class="sourceLineNo">084</span>     */<a name="line.84"></a>
+<span class="sourceLineNo">085</span>    public static final String FACTORY_PROPERTIES = "commons-logging.properties";<a name="line.85"></a>
+<span class="sourceLineNo">086</span><a name="line.86"></a>
+<span class="sourceLineNo">087</span>    /**<a name="line.87"></a>
+<span class="sourceLineNo">088</span>     * JDK1.3+ &lt;a href="http://java.sun.com/j2se/1.3/docs/guide/jar/jar.html#Service%20Provider"&gt;<a name="line.88"></a>
+<span class="sourceLineNo">089</span>     * 'Service Provider' specification&lt;/a&gt;.<a name="line.89"></a>
+<span class="sourceLineNo">090</span>     * &lt;p&gt;<a name="line.90"></a>
+<span class="sourceLineNo">091</span>     * This property is not used but preserved here for compatibility.<a name="line.91"></a>
+<span class="sourceLineNo">092</span>     */<a name="line.92"></a>
+<span class="sourceLineNo">093</span>    protected static final String SERVICE_ID = "META-INF/services/org.apache.commons.logging.LogFactory";<a name="line.93"></a>
+<span class="sourceLineNo">094</span><a name="line.94"></a>
+<span class="sourceLineNo">095</span>    /**<a name="line.95"></a>
+<span class="sourceLineNo">096</span>     * The name (&lt;code&gt;org.apache.commons.logging.diagnostics.dest&lt;/code&gt;) of<a name="line.96"></a>
+<span class="sourceLineNo">097</span>     * the property used to enable internal commons-logging diagnostic output, in<a name="line.97"></a>
+<span class="sourceLineNo">098</span>     * order to get information on what logging implementations are being<a name="line.98"></a>
+<span class="sourceLineNo">099</span>     * discovered, what classloaders they are loaded through, etc.<a name="line.99"></a>
+<span class="sourceLineNo">100</span>     * <a name="line.100"></a>
+<span class="sourceLineNo">101</span>     * &lt;p&gt;<a name="line.101"></a>
+<span class="sourceLineNo">102</span>     * This property is not used but preserved here for compatibility.<a name="line.102"></a>
+<span class="sourceLineNo">103</span>     */<a name="line.103"></a>
+<span class="sourceLineNo">104</span>    public static final String DIAGNOSTICS_DEST_PROPERTY = "org.apache.commons.logging.diagnostics.dest";<a name="line.104"></a>
+<span class="sourceLineNo">105</span><a name="line.105"></a>
+<span class="sourceLineNo">106</span>    /**<a name="line.106"></a>
+<span class="sourceLineNo">107</span>     * &lt;p&gt;<a name="line.107"></a>
+<span class="sourceLineNo">108</span>     * Setting this system property value allows the &lt;code&gt;Hashtable&lt;/code&gt; used<a name="line.108"></a>
+<span class="sourceLineNo">109</span>     * to store classloaders to be substituted by an alternative implementation.<a name="line.109"></a>
+<span class="sourceLineNo">110</span>     * &lt;p&gt;<a name="line.110"></a>
+<span class="sourceLineNo">111</span>     * This property is not used but preserved here for compatibility.<a name="line.111"></a>
+<span class="sourceLineNo">112</span>     */<a name="line.112"></a>
+<span class="sourceLineNo">113</span>    public static final String HASHTABLE_IMPLEMENTATION_PROPERTY = "org.apache.commons.logging.LogFactory.HashtableImpl";<a name="line.113"></a>
+<span class="sourceLineNo">114</span><a name="line.114"></a>
+<span class="sourceLineNo">115</span>    /**<a name="line.115"></a>
+<span class="sourceLineNo">116</span>     * The previously constructed &lt;code&gt;LogFactory&lt;/code&gt; instances, keyed by<a name="line.116"></a>
+<span class="sourceLineNo">117</span>     * the &lt;code&gt;ClassLoader&lt;/code&gt; with which it was created.<a name="line.117"></a>
+<span class="sourceLineNo">118</span>     * <a name="line.118"></a>
+<span class="sourceLineNo">119</span>     * &lt;p&gt;<a name="line.119"></a>
+<span class="sourceLineNo">120</span>     * This property is not used but preserved here for compatibility.<a name="line.120"></a>
+<span class="sourceLineNo">121</span>     */<a name="line.121"></a>
+<span class="sourceLineNo">122</span>    protected static Hashtable factories = null;<a name="line.122"></a>
+<span class="sourceLineNo">123</span><a name="line.123"></a>
+<span class="sourceLineNo">124</span>    /**<a name="line.124"></a>
+<span class="sourceLineNo">125</span>     * &lt;p&gt;<a name="line.125"></a>
+<span class="sourceLineNo">126</span>     * This property is not used but preserved here for compatibility.<a name="line.126"></a>
+<span class="sourceLineNo">127</span>     */<a name="line.127"></a>
+<span class="sourceLineNo">128</span>    protected static LogFactory nullClassLoaderFactory = null;<a name="line.128"></a>
+<span class="sourceLineNo">129</span><a name="line.129"></a>
+<span class="sourceLineNo">130</span>    /**<a name="line.130"></a>
+<span class="sourceLineNo">131</span>     * Protected constructor that is not available for public use.<a name="line.131"></a>
+<span class="sourceLineNo">132</span>     */<a name="line.132"></a>
+<span class="sourceLineNo">133</span>    protected LogFactory() {<a name="line.133"></a>
+<span class="sourceLineNo">134</span>    }<a name="line.134"></a>
+<span class="sourceLineNo">135</span><a name="line.135"></a>
+<span class="sourceLineNo">136</span>    // --------------------------------------------------------- Public Methods<a name="line.136"></a>
+<span class="sourceLineNo">137</span><a name="line.137"></a>
+<span class="sourceLineNo">138</span>    /**<a name="line.138"></a>
+<span class="sourceLineNo">139</span>     * Return the configuration attribute with the specified name (if any), or<a name="line.139"></a>
+<span class="sourceLineNo">140</span>     * &lt;code&gt;null&lt;/code&gt; if there is no such attribute.<a name="line.140"></a>
+<span class="sourceLineNo">141</span>     * <a name="line.141"></a>
+<span class="sourceLineNo">142</span>     * @param name Name of the attribute to return<a name="line.142"></a>
+<span class="sourceLineNo">143</span>     * @return configuration attribute<a name="line.143"></a>
+<span class="sourceLineNo">144</span>     */<a name="line.144"></a>
+<span class="sourceLineNo">145</span>    public abstract Object getAttribute(String name);<a name="line.145"></a>
+<span class="sourceLineNo">146</span><a name="line.146"></a>
+<span class="sourceLineNo">147</span>    /**<a name="line.147"></a>
+<span class="sourceLineNo">148</span>     * Return an array containing the names of all currently defined configuration<a name="line.148"></a>
+<span class="sourceLineNo">149</span>     * attributes. If there are no such attributes, a zero length array is<a name="line.149"></a>
+<span class="sourceLineNo">150</span>     * returned.<a name="line.150"></a>
+<span class="sourceLineNo">151</span>     * <a name="line.151"></a>
+<span class="sourceLineNo">152</span>     * @return names of all currently defined configuration attributes<a name="line.152"></a>
+<span class="sourceLineNo">153</span>     */<a name="line.153"></a>
+<span class="sourceLineNo">154</span>    public abstract String[] getAttributeNames();<a name="line.154"></a>
+<span class="sourceLineNo">155</span><a name="line.155"></a>
+<span class="sourceLineNo">156</span>    /**<a name="line.156"></a>
+<span class="sourceLineNo">157</span>     * Convenience method to derive a name from the specified class and call<a name="line.157"></a>
+<span class="sourceLineNo">158</span>     * &lt;code&gt;getInstance(String)&lt;/code&gt; with it.<a name="line.158"></a>
+<span class="sourceLineNo">159</span>     * <a name="line.159"></a>
+<span class="sourceLineNo">160</span>     * @param clazz<a name="line.160"></a>
+<span class="sourceLineNo">161</span>     *                Class for which a suitable Log name will be derived<a name="line.161"></a>
+<span class="sourceLineNo">162</span>     * <a name="line.162"></a>
+<span class="sourceLineNo">163</span>     * @exception LogConfigurationException<a name="line.163"></a>
+<span class="sourceLineNo">164</span>     *                    if a suitable &lt;code&gt;Log&lt;/code&gt; instance cannot be<a name="line.164"></a>
+<span class="sourceLineNo">165</span>     *                    returned<a name="line.165"></a>
+<span class="sourceLineNo">166</span>     */<a name="line.166"></a>
+<span class="sourceLineNo">167</span>    public abstract Log getInstance(Class clazz) throws LogConfigurationException;<a name="line.167"></a>
+<span class="sourceLineNo">168</span><a name="line.168"></a>
+<span class="sourceLineNo">169</span>    /**<a name="line.169"></a>
+<span class="sourceLineNo">170</span>     * &lt;p&gt;<a name="line.170"></a>
+<span class="sourceLineNo">171</span>     * Construct (if necessary) and return a &lt;code&gt;Log&lt;/code&gt; instance, using<a name="line.171"></a>
+<span class="sourceLineNo">172</span>     * the factory's current set of configuration attributes.<a name="line.172"></a>
+<span class="sourceLineNo">173</span>     * &lt;/p&gt;<a name="line.173"></a>
+<span class="sourceLineNo">174</span>     * <a name="line.174"></a>
+<span class="sourceLineNo">175</span>     * &lt;p&gt;<a name="line.175"></a>
+<span class="sourceLineNo">176</span>     * &lt;strong&gt;NOTE &lt;/strong&gt;- Depending upon the implementation of the<a name="line.176"></a>
+<span class="sourceLineNo">177</span>     * &lt;code&gt;LogFactory&lt;/code&gt; you are using, the &lt;code&gt;Log&lt;/code&gt; instance<a name="line.177"></a>
+<span class="sourceLineNo">178</span>     * you are returned may or may not be local to the current application, and<a name="line.178"></a>
+<span class="sourceLineNo">179</span>     * may or may not be returned again on a subsequent call with the same name<a name="line.179"></a>
+<span class="sourceLineNo">180</span>     * argument.<a name="line.180"></a>
+<span class="sourceLineNo">181</span>     * &lt;/p&gt;<a name="line.181"></a>
+<span class="sourceLineNo">182</span>     * <a name="line.182"></a>
+<span class="sourceLineNo">183</span>     * @param name<a name="line.183"></a>
+<span class="sourceLineNo">184</span>     *                Logical name of the &lt;code&gt;Log&lt;/code&gt; instance to be<a name="line.184"></a>
+<span class="sourceLineNo">185</span>     *                returned (the meaning of this name is only known to the<a name="line.185"></a>
+<span class="sourceLineNo">186</span>     *                underlying logging implementation that is being wrapped)<a name="line.186"></a>
+<span class="sourceLineNo">187</span>     * <a name="line.187"></a>
+<span class="sourceLineNo">188</span>     * @exception LogConfigurationException<a name="line.188"></a>
+<span class="sourceLineNo">189</span>     *                    if a suitable &lt;code&gt;Log&lt;/code&gt; instance cannot be<a name="line.189"></a>
+<span class="sourceLineNo">190</span>     *                    returned<a name="line.190"></a>
+<span class="sourceLineNo">191</span>     */<a name="line.191"></a>
+<span class="sourceLineNo">192</span>    public abstract Log getInstance(String name) throws LogConfigurationException;<a name="line.192"></a>
+<span class="sourceLineNo">193</span><a name="line.193"></a>
+<span class="sourceLineNo">194</span>    /**<a name="line.194"></a>
+<span class="sourceLineNo">195</span>     * Release any internal references to previously created {@link Log}instances<a name="line.195"></a>
+<span class="sourceLineNo">196</span>     * returned by this factory. This is useful in environments like servlet<a name="line.196"></a>
+<span class="sourceLineNo">197</span>     * containers, which implement application reloading by throwing away a<a name="line.197"></a>
+<span class="sourceLineNo">198</span>     * ClassLoader. Dangling references to objects in that class loader would<a name="line.198"></a>
+<span class="sourceLineNo">199</span>     * prevent garbage collection.<a name="line.199"></a>
+<span class="sourceLineNo">200</span>     */<a name="line.200"></a>
+<span class="sourceLineNo">201</span>    public abstract void release();<a name="line.201"></a>
+<span class="sourceLineNo">202</span><a name="line.202"></a>
+<span class="sourceLineNo">203</span>    /**<a name="line.203"></a>
+<span class="sourceLineNo">204</span>     * Remove any configuration attribute associated with the specified name. If<a name="line.204"></a>
+<span class="sourceLineNo">205</span>     * there is no such attribute, no action is taken.<a name="line.205"></a>
+<span class="sourceLineNo">206</span>     * <a name="line.206"></a>
+<span class="sourceLineNo">207</span>     * @param name<a name="line.207"></a>
+<span class="sourceLineNo">208</span>     *                Name of the attribute to remove<a name="line.208"></a>
+<span class="sourceLineNo">209</span>     */<a name="line.209"></a>
+<span class="sourceLineNo">210</span>    public abstract void removeAttribute(String name);<a name="line.210"></a>
+<span class="sourceLineNo">211</span><a name="line.211"></a>
+<span class="sourceLineNo">212</span>    /**<a name="line.212"></a>
+<span class="sourceLineNo">213</span>     * Set the configuration attribute with the specified name. Calling this with<a name="line.213"></a>
+<span class="sourceLineNo">214</span>     * a &lt;code&gt;null&lt;/code&gt; value is equivalent to calling<a name="line.214"></a>
+<span class="sourceLineNo">215</span>     * &lt;code&gt;removeAttribute(name)&lt;/code&gt;.<a name="line.215"></a>
+<span class="sourceLineNo">216</span>     * <a name="line.216"></a>
+<span class="sourceLineNo">217</span>     * @param name<a name="line.217"></a>
+<span class="sourceLineNo">218</span>     *                Name of the attribute to set<a name="line.218"></a>
+<span class="sourceLineNo">219</span>     * @param value<a name="line.219"></a>
+<span class="sourceLineNo">220</span>     *                Value of the attribute to set, or &lt;code&gt;null&lt;/code&gt; to<a name="line.220"></a>
+<span class="sourceLineNo">221</span>     *                remove any setting for this attribute<a name="line.221"></a>
+<span class="sourceLineNo">222</span>     */<a name="line.222"></a>
+<span class="sourceLineNo">223</span>    public abstract void setAttribute(String name, Object value);<a name="line.223"></a>
+<span class="sourceLineNo">224</span><a name="line.224"></a>
+<span class="sourceLineNo">225</span>    // --------------------------------------------------------- Static Methods<a name="line.225"></a>
+<span class="sourceLineNo">226</span><a name="line.226"></a>
+<span class="sourceLineNo">227</span>    /**<a name="line.227"></a>
+<span class="sourceLineNo">228</span>     * &lt;p&gt;<a name="line.228"></a>
+<span class="sourceLineNo">229</span>     * Construct (if necessary) and return a &lt;code&gt;LogFactory&lt;/code&gt; instance,<a name="line.229"></a>
+<span class="sourceLineNo">230</span>     * using the following ordered lookup procedure to determine the name of the<a name="line.230"></a>
+<span class="sourceLineNo">231</span>     * implementation class to be loaded.<a name="line.231"></a>
+<span class="sourceLineNo">232</span>     * &lt;/p&gt;<a name="line.232"></a>
+<span class="sourceLineNo">233</span>     * &lt;ul&gt;<a name="line.233"></a>
+<span class="sourceLineNo">234</span>     * &lt;li&gt;The &lt;code&gt;org.apache.commons.logging.LogFactory&lt;/code&gt; system<a name="line.234"></a>
+<span class="sourceLineNo">235</span>     * property.&lt;/li&gt;<a name="line.235"></a>
+<span class="sourceLineNo">236</span>     * &lt;li&gt;The JDK 1.3 Service Discovery mechanism&lt;/li&gt;<a name="line.236"></a>
+<span class="sourceLineNo">237</span>     * &lt;li&gt;Use the properties file &lt;code&gt;commons-logging.properties&lt;/code&gt;<a name="line.237"></a>
+<span class="sourceLineNo">238</span>     * file, if found in the class path of this class. The configuration file is<a name="line.238"></a>
+<span class="sourceLineNo">239</span>     * in standard &lt;code&gt;java.util.Properties&lt;/code&gt; format and contains the<a name="line.239"></a>
+<span class="sourceLineNo">240</span>     * fully qualified name of the implementation class with the key being the<a name="line.240"></a>
+<span class="sourceLineNo">241</span>     * system property defined above.&lt;/li&gt;<a name="line.241"></a>
+<span class="sourceLineNo">242</span>     * &lt;li&gt;Fall back to a default implementation class (<a name="line.242"></a>
+<span class="sourceLineNo">243</span>     * &lt;code&gt;org.apache.commons.logging.impl.SLF4FLogFactory&lt;/code&gt;).&lt;/li&gt;<a name="line.243"></a>
+<span class="sourceLineNo">244</span>     * &lt;/ul&gt;<a name="line.244"></a>
+<span class="sourceLineNo">245</span>     * <a name="line.245"></a>
+<span class="sourceLineNo">246</span>     * &lt;p&gt;<a name="line.246"></a>
+<span class="sourceLineNo">247</span>     * &lt;em&gt;NOTE&lt;/em&gt;- If the properties file method of identifying the<a name="line.247"></a>
+<span class="sourceLineNo">248</span>     * &lt;code&gt;LogFactory&lt;/code&gt; implementation class is utilized, all of the<a name="line.248"></a>
+<span class="sourceLineNo">249</span>     * properties defined in this file will be set as configuration attributes on<a name="line.249"></a>
+<span class="sourceLineNo">250</span>     * the corresponding &lt;code&gt;LogFactory&lt;/code&gt; instance.<a name="line.250"></a>
+<span class="sourceLineNo">251</span>     * &lt;/p&gt;<a name="line.251"></a>
+<span class="sourceLineNo">252</span>     * <a name="line.252"></a>
+<span class="sourceLineNo">253</span>     * @exception LogConfigurationException<a name="line.253"></a>
+<span class="sourceLineNo">254</span>     *                    if the implementation class is not available or cannot<a name="line.254"></a>
+<span class="sourceLineNo">255</span>     *                    be instantiated.<a name="line.255"></a>
+<span class="sourceLineNo">256</span>     */<a name="line.256"></a>
+<span class="sourceLineNo">257</span>    public static LogFactory getFactory() throws LogConfigurationException {<a name="line.257"></a>
+<span class="sourceLineNo">258</span>        return logFactory;<a name="line.258"></a>
+<span class="sourceLineNo">259</span>    }<a name="line.259"></a>
+<span class="sourceLineNo">260</span><a name="line.260"></a>
+<span class="sourceLineNo">261</span>    /**<a name="line.261"></a>
+<span class="sourceLineNo">262</span>     * Convenience method to return a named logger, without the application having<a name="line.262"></a>
+<span class="sourceLineNo">263</span>     * to care about factories.<a name="line.263"></a>
+<span class="sourceLineNo">264</span>     * <a name="line.264"></a>
+<span class="sourceLineNo">265</span>     * @param clazz<a name="line.265"></a>
+<span class="sourceLineNo">266</span>     *                Class from which a log name will be derived<a name="line.266"></a>
+<span class="sourceLineNo">267</span>     * <a name="line.267"></a>
+<span class="sourceLineNo">268</span>     * @exception LogConfigurationException<a name="line.268"></a>
+<span class="sourceLineNo">269</span>     *                    if a suitable &lt;code&gt;Log&lt;/code&gt; instance cannot be<a name="line.269"></a>
+<span class="sourceLineNo">270</span>     *                    returned<a name="line.270"></a>
+<span class="sourceLineNo">271</span>     */<a name="line.271"></a>
+<span class="sourceLineNo">272</span>    public static Log getLog(Class clazz) throws LogConfigurationException {<a name="line.272"></a>
+<span class="sourceLineNo">273</span>        return (getFactory().getInstance(clazz));<a name="line.273"></a>
+<span class="sourceLineNo">274</span>    }<a name="line.274"></a>
+<span class="sourceLineNo">275</span><a name="line.275"></a>
+<span class="sourceLineNo">276</span>    /**<a name="line.276"></a>
+<span class="sourceLineNo">277</span>     * Convenience method to return a named logger, without the application having<a name="line.277"></a>
+<span class="sourceLineNo">278</span>     * to care about factories.<a name="line.278"></a>
+<span class="sourceLineNo">279</span>     * <a name="line.279"></a>
+<span class="sourceLineNo">280</span>     * @param name<a name="line.280"></a>
+<span class="sourceLineNo">281</span>     *                Logical name of the &lt;code&gt;Log&lt;/code&gt; instance to be<a name="line.281"></a>
+<span class="sourceLineNo">282</span>     *                returned (the meaning of this name is only known to the<a name="line.282"></a>
+<span class="sourceLineNo">283</span>     *                underlying logging implementation that is being wrapped)<a name="line.283"></a>
+<span class="sourceLineNo">284</span>     * <a name="line.284"></a>
+<span class="sourceLineNo">285</span>     * @exception LogConfigurationException<a name="line.285"></a>
+<span class="sourceLineNo">286</span>     *                    if a suitable &lt;code&gt;Log&lt;/code&gt; instance cannot be<a name="line.286"></a>
+<span class="sourceLineNo">287</span>     *                    returned<a name="line.287"></a>
+<span class="sourceLineNo">288</span>     */<a name="line.288"></a>
+<span class="sourceLineNo">289</span>    public static Log getLog(String name) throws LogConfigurationException {<a name="line.289"></a>
+<span class="sourceLineNo">290</span>        return (getFactory().getInstance(name));<a name="line.290"></a>
+<span class="sourceLineNo">291</span>    }<a name="line.291"></a>
+<span class="sourceLineNo">292</span><a name="line.292"></a>
+<span class="sourceLineNo">293</span>    /**<a name="line.293"></a>
+<span class="sourceLineNo">294</span>     * Release any internal references to previously created {@link LogFactory}<a name="line.294"></a>
+<span class="sourceLineNo">295</span>     * instances that have been associated with the specified class loader (if<a name="line.295"></a>
+<span class="sourceLineNo">296</span>     * any), after calling the instance method &lt;code&gt;release()&lt;/code&gt; on each of<a name="line.296"></a>
+<span class="sourceLineNo">297</span>     * them.<a name="line.297"></a>
+<span class="sourceLineNo">298</span>     * <a name="line.298"></a>
+<span class="sourceLineNo">299</span>     * @param classLoader<a name="line.299"></a>
+<span class="sourceLineNo">300</span>     *                ClassLoader for which to release the LogFactory<a name="line.300"></a>
+<span class="sourceLineNo">301</span>     */<a name="line.301"></a>
+<span class="sourceLineNo">302</span>    public static void release(ClassLoader classLoader) {<a name="line.302"></a>
+<span class="sourceLineNo">303</span>        // since SLF4J based JCL does not make use of classloaders, there is nothing<a name="line.303"></a>
+<span class="sourceLineNo">304</span>        // to do here<a name="line.304"></a>
+<span class="sourceLineNo">305</span>    }<a name="line.305"></a>
+<span class="sourceLineNo">306</span><a name="line.306"></a>
+<span class="sourceLineNo">307</span>    /**<a name="line.307"></a>
+<span class="sourceLineNo">308</span>     * Release any internal references to previously created {@link LogFactory}<a name="line.308"></a>
+<span class="sourceLineNo">309</span>     * instances, after calling the instance method &lt;code&gt;release()&lt;/code&gt; on<a name="line.309"></a>
+<span class="sourceLineNo">310</span>     * each of them. This is useful in environments like servlet containers, which<a name="line.310"></a>
+<span class="sourceLineNo">311</span>     * implement application reloading by throwing away a ClassLoader. Dangling<a name="line.311"></a>
+<span class="sourceLineNo">312</span>     * references to objects in that class loader would prevent garbage<a name="line.312"></a>
+<span class="sourceLineNo">313</span>     * collection.<a name="line.313"></a>
+<span class="sourceLineNo">314</span>     */<a name="line.314"></a>
+<span class="sourceLineNo">315</span>    public static void releaseAll() {<a name="line.315"></a>
+<span class="sourceLineNo">316</span>        // since SLF4J based JCL does not make use of classloaders, there is nothing<a name="line.316"></a>
+<span class="sourceLineNo">317</span>        // to do here<a name="line.317"></a>
+<span class="sourceLineNo">318</span>    }<a name="line.318"></a>
+<span class="sourceLineNo">319</span><a name="line.319"></a>
+<span class="sourceLineNo">320</span>    /**<a name="line.320"></a>
+<span class="sourceLineNo">321</span>     * Returns a string that uniquely identifies the specified object, including<a name="line.321"></a>
+<span class="sourceLineNo">322</span>     * its class.<a name="line.322"></a>
+<span class="sourceLineNo">323</span>     * &lt;p&gt;<a name="line.323"></a>
+<span class="sourceLineNo">324</span>     * The returned string is of form "classname@hashcode", i.e. is the same as the<a name="line.324"></a>
+<span class="sourceLineNo">325</span>     * return value of the Object.toString() method, but works even when the<a name="line.325"></a>
+<span class="sourceLineNo">326</span>     * specified object's class has overridden the toString method.<a name="line.326"></a>
+<span class="sourceLineNo">327</span>     * <a name="line.327"></a>
+<span class="sourceLineNo">328</span>     * @param o<a name="line.328"></a>
+<span class="sourceLineNo">329</span>     *                may be null.<a name="line.329"></a>
+<span class="sourceLineNo">330</span>     * @return a string of form classname@hashcode, or "null" if param o is null.<a name="line.330"></a>
+<span class="sourceLineNo">331</span>     * @since 1.1<a name="line.331"></a>
+<span class="sourceLineNo">332</span>     */<a name="line.332"></a>
+<span class="sourceLineNo">333</span>    public static String objectId(Object o) {<a name="line.333"></a>
+<span class="sourceLineNo">334</span>        if (o == null) {<a name="line.334"></a>
+<span class="sourceLineNo">335</span>            return "null";<a name="line.335"></a>
+<span class="sourceLineNo">336</span>        } else {<a name="line.336"></a>
+<span class="sourceLineNo">337</span>            return o.getClass().getName() + "@" + System.identityHashCode(o);<a name="line.337"></a>
+<span class="sourceLineNo">338</span>        }<a name="line.338"></a>
+<span class="sourceLineNo">339</span>    }<a name="line.339"></a>
+<span class="sourceLineNo">340</span><a name="line.340"></a>
+<span class="sourceLineNo">341</span>    // protected methods which were added in JCL 1.1. These are not used<a name="line.341"></a>
+<span class="sourceLineNo">342</span>    // by SLF4JLogFactory<a name="line.342"></a>
+<span class="sourceLineNo">343</span><a name="line.343"></a>
+<span class="sourceLineNo">344</span>    /**<a name="line.344"></a>
+<span class="sourceLineNo">345</span>     * This method exists to ensure signature compatibility.<a name="line.345"></a>
+<span class="sourceLineNo">346</span>     */<a name="line.346"></a>
+<span class="sourceLineNo">347</span>    protected static Object createFactory(String factoryClass, ClassLoader classLoader) {<a name="line.347"></a>
+<span class="sourceLineNo">348</span>        throw new UnsupportedOperationException("Operation [factoryClass] is not supported in jcl-over-slf4j. See also "<a name="line.348"></a>
+<span class="sourceLineNo">349</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.349"></a>
+<span class="sourceLineNo">350</span>    }<a name="line.350"></a>
+<span class="sourceLineNo">351</span><a name="line.351"></a>
+<span class="sourceLineNo">352</span>    /**<a name="line.352"></a>
+<span class="sourceLineNo">353</span>     * This method exists to ensure signature compatibility.<a name="line.353"></a>
+<span class="sourceLineNo">354</span>     */<a name="line.354"></a>
+<span class="sourceLineNo">355</span>    protected static ClassLoader directGetContextClassLoader() {<a name="line.355"></a>
+<span class="sourceLineNo">356</span>        throw new UnsupportedOperationException("Operation [directGetContextClassLoader] is not supported in jcl-over-slf4j. See also "<a name="line.356"></a>
+<span class="sourceLineNo">357</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.357"></a>
+<span class="sourceLineNo">358</span>    }<a name="line.358"></a>
+<span class="sourceLineNo">359</span><a name="line.359"></a>
+<span class="sourceLineNo">360</span>    /**<a name="line.360"></a>
+<span class="sourceLineNo">361</span>     * This method exists to ensure signature compatibility.<a name="line.361"></a>
+<span class="sourceLineNo">362</span>     */<a name="line.362"></a>
+<span class="sourceLineNo">363</span>    protected static ClassLoader getContextClassLoader() throws LogConfigurationException {<a name="line.363"></a>
+<span class="sourceLineNo">364</span>        throw new UnsupportedOperationException("Operation [getContextClassLoader] is not supported in jcl-over-slf4j. See also "<a name="line.364"></a>
+<span class="sourceLineNo">365</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.365"></a>
+<span class="sourceLineNo">366</span>    }<a name="line.366"></a>
+<span class="sourceLineNo">367</span><a name="line.367"></a>
+<span class="sourceLineNo">368</span>    /**<a name="line.368"></a>
+<span class="sourceLineNo">369</span>     * This method exists to ensure signature compatibility.<a name="line.369"></a>
+<span class="sourceLineNo">370</span>     */<a name="line.370"></a>
+<span class="sourceLineNo">371</span>    protected static ClassLoader getClassLoader(Class clazz) {<a name="line.371"></a>
+<span class="sourceLineNo">372</span>        throw new UnsupportedOperationException("Operation [getClassLoader] is not supported in jcl-over-slf4j. See also "<a name="line.372"></a>
+<span class="sourceLineNo">373</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.373"></a>
+<span class="sourceLineNo">374</span>    }<a name="line.374"></a>
+<span class="sourceLineNo">375</span><a name="line.375"></a>
+<span class="sourceLineNo">376</span>    /**<a name="line.376"></a>
+<span class="sourceLineNo">377</span>     * This method exists to ensure signature compatibility.<a name="line.377"></a>
+<span class="sourceLineNo">378</span>     */<a name="line.378"></a>
+<span class="sourceLineNo">379</span>    protected static boolean isDiagnosticsEnabled() {<a name="line.379"></a>
+<span class="sourceLineNo">380</span>        throw new UnsupportedOperationException("Operation [isDiagnosticsEnabled] is not supported in jcl-over-slf4j. See also "<a name="line.380"></a>
+<span class="sourceLineNo">381</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.381"></a>
+<span class="sourceLineNo">382</span>    }<a name="line.382"></a>
+<span class="sourceLineNo">383</span><a name="line.383"></a>
+<span class="sourceLineNo">384</span>    /**<a name="line.384"></a>
+<span class="sourceLineNo">385</span>     * This method exists to ensure signature compatibility.<a name="line.385"></a>
+<span class="sourceLineNo">386</span>     */<a name="line.386"></a>
+<span class="sourceLineNo">387</span>    protected static void logRawDiagnostic(String msg) {<a name="line.387"></a>
+<span class="sourceLineNo">388</span>        throw new UnsupportedOperationException("Operation [logRawDiagnostic] is not supported in jcl-over-slf4j. See also "<a name="line.388"></a>
+<span class="sourceLineNo">389</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.389"></a>
+<span class="sourceLineNo">390</span>    }<a name="line.390"></a>
+<span class="sourceLineNo">391</span><a name="line.391"></a>
+<span class="sourceLineNo">392</span>    /**<a name="line.392"></a>
+<span class="sourceLineNo">393</span>     * This method exists to ensure signature compatibility.<a name="line.393"></a>
+<span class="sourceLineNo">394</span>     */<a name="line.394"></a>
+<span class="sourceLineNo">395</span>    protected static LogFactory newFactory(final String factoryClass, final ClassLoader classLoader, final ClassLoader contextClassLoader) {<a name="line.395"></a>
+<span class="sourceLineNo">396</span>        throw new UnsupportedOperationException("Operation [logRawDiagnostic] is not supported in jcl-over-slf4j. See also "<a name="line.396"></a>
+<span class="sourceLineNo">397</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.397"></a>
+<span class="sourceLineNo">398</span>    }<a name="line.398"></a>
+<span class="sourceLineNo">399</span><a name="line.399"></a>
+<span class="sourceLineNo">400</span>    /**<a name="line.400"></a>
+<span class="sourceLineNo">401</span>     * This method exists to ensure signature compatibility.<a name="line.401"></a>
+<span class="sourceLineNo">402</span>     */<a name="line.402"></a>
+<span class="sourceLineNo">403</span>    protected static LogFactory newFactory(final String factoryClass, final ClassLoader classLoader) {<a name="line.403"></a>
+<span class="sourceLineNo">404</span>        throw new UnsupportedOperationException("Operation [newFactory] is not supported in jcl-over-slf4j. See also "<a name="line.404"></a>
+<span class="sourceLineNo">405</span>                        + UNSUPPORTED_OPERATION_IN_JCL_OVER_SLF4J);<a name="line.405"></a>
+<span class="sourceLineNo">406</span>    }<a name="line.406"></a>
+<span class="sourceLineNo">407</span><a name="line.407"></a>
+<span class="sourceLineNo">408</span>}<a name="line.408"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>

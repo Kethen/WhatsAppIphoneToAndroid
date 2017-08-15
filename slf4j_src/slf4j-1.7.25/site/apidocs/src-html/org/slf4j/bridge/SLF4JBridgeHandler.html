@@ -1,0 +1,381 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/**<a name="line.1"></a>
+<span class="sourceLineNo">002</span> * Copyright (c) 2004-2011 QOS.ch<a name="line.2"></a>
+<span class="sourceLineNo">003</span> * All rights reserved.<a name="line.3"></a>
+<span class="sourceLineNo">004</span> *<a name="line.4"></a>
+<span class="sourceLineNo">005</span> * Permission is hereby granted, free  of charge, to any person obtaining<a name="line.5"></a>
+<span class="sourceLineNo">006</span> * a  copy  of this  software  and  associated  documentation files  (the<a name="line.6"></a>
+<span class="sourceLineNo">007</span> * "Software"), to  deal in  the Software without  restriction, including<a name="line.7"></a>
+<span class="sourceLineNo">008</span> * without limitation  the rights to  use, copy, modify,  merge, publish,<a name="line.8"></a>
+<span class="sourceLineNo">009</span> * distribute,  sublicense, and/or sell  copies of  the Software,  and to<a name="line.9"></a>
+<span class="sourceLineNo">010</span> * permit persons to whom the Software  is furnished to do so, subject to<a name="line.10"></a>
+<span class="sourceLineNo">011</span> * the following conditions:<a name="line.11"></a>
+<span class="sourceLineNo">012</span> *<a name="line.12"></a>
+<span class="sourceLineNo">013</span> * The  above  copyright  notice  and  this permission  notice  shall  be<a name="line.13"></a>
+<span class="sourceLineNo">014</span> * included in all copies or substantial portions of the Software.<a name="line.14"></a>
+<span class="sourceLineNo">015</span> *<a name="line.15"></a>
+<span class="sourceLineNo">016</span> * THE  SOFTWARE IS  PROVIDED  "AS  IS", WITHOUT  WARRANTY  OF ANY  KIND,<a name="line.16"></a>
+<span class="sourceLineNo">017</span> * EXPRESS OR  IMPLIED, INCLUDING  BUT NOT LIMITED  TO THE  WARRANTIES OF<a name="line.17"></a>
+<span class="sourceLineNo">018</span> * MERCHANTABILITY,    FITNESS    FOR    A   PARTICULAR    PURPOSE    AND<a name="line.18"></a>
+<span class="sourceLineNo">019</span> * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE<a name="line.19"></a>
+<span class="sourceLineNo">020</span> * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION<a name="line.20"></a>
+<span class="sourceLineNo">021</span> * OF CONTRACT, TORT OR OTHERWISE,  ARISING FROM, OUT OF OR IN CONNECTION<a name="line.21"></a>
+<span class="sourceLineNo">022</span> * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.<a name="line.22"></a>
+<span class="sourceLineNo">023</span> *<a name="line.23"></a>
+<span class="sourceLineNo">024</span> */<a name="line.24"></a>
+<span class="sourceLineNo">025</span>package org.slf4j.bridge;<a name="line.25"></a>
+<span class="sourceLineNo">026</span><a name="line.26"></a>
+<span class="sourceLineNo">027</span>import java.text.MessageFormat;<a name="line.27"></a>
+<span class="sourceLineNo">028</span>import java.util.MissingResourceException;<a name="line.28"></a>
+<span class="sourceLineNo">029</span>import java.util.ResourceBundle;<a name="line.29"></a>
+<span class="sourceLineNo">030</span>import java.util.logging.Handler;<a name="line.30"></a>
+<span class="sourceLineNo">031</span>import java.util.logging.Level;<a name="line.31"></a>
+<span class="sourceLineNo">032</span>import java.util.logging.LogManager;<a name="line.32"></a>
+<span class="sourceLineNo">033</span>import java.util.logging.LogRecord;<a name="line.33"></a>
+<span class="sourceLineNo">034</span><a name="line.34"></a>
+<span class="sourceLineNo">035</span>import org.slf4j.Logger;<a name="line.35"></a>
+<span class="sourceLineNo">036</span>import org.slf4j.LoggerFactory;<a name="line.36"></a>
+<span class="sourceLineNo">037</span>import org.slf4j.spi.LocationAwareLogger;<a name="line.37"></a>
+<span class="sourceLineNo">038</span><a name="line.38"></a>
+<span class="sourceLineNo">039</span>// Based on http://jira.qos.ch/browse/SLF4J-30<a name="line.39"></a>
+<span class="sourceLineNo">040</span><a name="line.40"></a>
+<span class="sourceLineNo">041</span>/**<a name="line.41"></a>
+<span class="sourceLineNo">042</span> * &lt;p&gt;Bridge/route all JUL log records to the SLF4J API.&lt;/p&gt;<a name="line.42"></a>
+<span class="sourceLineNo">043</span> * &lt;p&gt;Essentially, the idea is to install on the root logger an instance of<a name="line.43"></a>
+<span class="sourceLineNo">044</span> * &lt;code&gt;SLF4JBridgeHandler&lt;/code&gt; as the sole JUL handler in the system. Subsequently, the<a name="line.44"></a>
+<span class="sourceLineNo">045</span> * SLF4JBridgeHandler instance will redirect all JUL log records are redirected<a name="line.45"></a>
+<span class="sourceLineNo">046</span> * to the SLF4J API based on the following mapping of levels:<a name="line.46"></a>
+<span class="sourceLineNo">047</span> * &lt;/p&gt;<a name="line.47"></a>
+<span class="sourceLineNo">048</span> * &lt;pre&gt;<a name="line.48"></a>
+<span class="sourceLineNo">049</span> * FINEST  -&amp;gt; TRACE<a name="line.49"></a>
+<span class="sourceLineNo">050</span> * FINER   -&amp;gt; DEBUG<a name="line.50"></a>
+<span class="sourceLineNo">051</span> * FINE    -&amp;gt; DEBUG<a name="line.51"></a>
+<span class="sourceLineNo">052</span> * INFO    -&amp;gt; INFO<a name="line.52"></a>
+<span class="sourceLineNo">053</span> * WARNING -&amp;gt; WARN<a name="line.53"></a>
+<span class="sourceLineNo">054</span> * SEVERE  -&amp;gt; ERROR&lt;/pre&gt;<a name="line.54"></a>
+<span class="sourceLineNo">055</span> * &lt;p&gt;&lt;b&gt;Programmatic installation:&lt;/b&gt;&lt;/p&gt;<a name="line.55"></a>
+<span class="sourceLineNo">056</span> * &lt;pre&gt;<a name="line.56"></a>
+<span class="sourceLineNo">057</span> * // Optionally remove existing handlers attached to j.u.l root logger<a name="line.57"></a>
+<span class="sourceLineNo">058</span> * SLF4JBridgeHandler.removeHandlersForRootLogger();  // (since SLF4J 1.6.5)<a name="line.58"></a>
+<span class="sourceLineNo">059</span><a name="line.59"></a>
+<span class="sourceLineNo">060</span> * // add SLF4JBridgeHandler to j.u.l's root logger, should be done once during<a name="line.60"></a>
+<span class="sourceLineNo">061</span> * // the initialization phase of your application<a name="line.61"></a>
+<span class="sourceLineNo">062</span> * SLF4JBridgeHandler.install();&lt;/pre&gt;<a name="line.62"></a>
+<span class="sourceLineNo">063</span> * &lt;p&gt;&lt;b&gt;Installation via &lt;em&gt;logging.properties&lt;/em&gt; configuration file:&lt;/b&gt;&lt;/p&gt;<a name="line.63"></a>
+<span class="sourceLineNo">064</span> * &lt;pre&gt;<a name="line.64"></a>
+<span class="sourceLineNo">065</span> * // register SLF4JBridgeHandler as handler for the j.u.l. root logger<a name="line.65"></a>
+<span class="sourceLineNo">066</span> * handlers = org.slf4j.bridge.SLF4JBridgeHandler&lt;/pre&gt;<a name="line.66"></a>
+<span class="sourceLineNo">067</span> * &lt;p&gt;Once SLF4JBridgeHandler is installed, logging by j.u.l. loggers will be directed to<a name="line.67"></a>
+<span class="sourceLineNo">068</span> * SLF4J. Example: &lt;/p&gt;<a name="line.68"></a>
+<span class="sourceLineNo">069</span> * &lt;pre&gt;<a name="line.69"></a>
+<span class="sourceLineNo">070</span> * import  java.util.logging.Logger;<a name="line.70"></a>
+<span class="sourceLineNo">071</span> * ...<a name="line.71"></a>
+<span class="sourceLineNo">072</span> * // usual pattern: get a Logger and then log a message<a name="line.72"></a>
+<span class="sourceLineNo">073</span> * Logger julLogger = Logger.getLogger(&amp;quot;org.wombat&amp;quot;);<a name="line.73"></a>
+<span class="sourceLineNo">074</span> * julLogger.fine(&amp;quot;hello world&amp;quot;); // this will get redirected to SLF4J&lt;/pre&gt;<a name="line.74"></a>
+<span class="sourceLineNo">075</span> *<a name="line.75"></a>
+<span class="sourceLineNo">076</span> * &lt;p&gt;Please note that translating a java.util.logging event into SLF4J incurs the<a name="line.76"></a>
+<span class="sourceLineNo">077</span> * cost of constructing {@link LogRecord} instance regardless of whether the<a name="line.77"></a>
+<span class="sourceLineNo">078</span> * SLF4J logger is disabled for the given level. &lt;b&gt;Consequently, j.u.l. to<a name="line.78"></a>
+<span class="sourceLineNo">079</span> * SLF4J translation can seriously increase the cost of disabled logging<a name="line.79"></a>
+<span class="sourceLineNo">080</span> * statements (60 fold or 6000% increase) and measurably impact the performance of enabled log<a name="line.80"></a>
+<span class="sourceLineNo">081</span> * statements (20% overall increase).&lt;/b&gt; Please note that as of logback-version 0.9.25,<a name="line.81"></a>
+<span class="sourceLineNo">082</span> * it is possible to completely eliminate the 60 fold translation overhead for disabled<a name="line.82"></a>
+<span class="sourceLineNo">083</span> * log statements with the help of &lt;a href="http://logback.qos.ch/manual/configuration.html#LevelChangePropagator"&gt;LevelChangePropagator&lt;/a&gt;.<a name="line.83"></a>
+<span class="sourceLineNo">084</span> * &lt;/p&gt;<a name="line.84"></a>
+<span class="sourceLineNo">085</span> *<a name="line.85"></a>
+<span class="sourceLineNo">086</span> * &lt;p&gt;If you are concerned about application performance, then use of &lt;code&gt;SLF4JBridgeHandler&lt;/code&gt;<a name="line.86"></a>
+<span class="sourceLineNo">087</span> * is appropriate only if any one the following two conditions is true:&lt;/p&gt;<a name="line.87"></a>
+<span class="sourceLineNo">088</span> * &lt;ol&gt;<a name="line.88"></a>
+<span class="sourceLineNo">089</span> * &lt;li&gt;few j.u.l. logging statements are in play&lt;/li&gt;<a name="line.89"></a>
+<span class="sourceLineNo">090</span> * &lt;li&gt;LevelChangePropagator has been installed&lt;/li&gt;<a name="line.90"></a>
+<span class="sourceLineNo">091</span> * &lt;/ol&gt;<a name="line.91"></a>
+<span class="sourceLineNo">092</span> *<a name="line.92"></a>
+<span class="sourceLineNo">093</span> * @author Christian Stein<a name="line.93"></a>
+<span class="sourceLineNo">094</span> * @author Joern Huxhorn<a name="line.94"></a>
+<span class="sourceLineNo">095</span> * @author Ceki G&amp;uuml;lc&amp;uuml;<a name="line.95"></a>
+<span class="sourceLineNo">096</span> * @author Darryl Smith<a name="line.96"></a>
+<span class="sourceLineNo">097</span> * @since 1.5.1<a name="line.97"></a>
+<span class="sourceLineNo">098</span> */<a name="line.98"></a>
+<span class="sourceLineNo">099</span>public class SLF4JBridgeHandler extends Handler {<a name="line.99"></a>
+<span class="sourceLineNo">100</span><a name="line.100"></a>
+<span class="sourceLineNo">101</span>    // The caller is java.util.logging.Logger<a name="line.101"></a>
+<span class="sourceLineNo">102</span>    private static final String FQCN = java.util.logging.Logger.class.getName();<a name="line.102"></a>
+<span class="sourceLineNo">103</span>    private static final String UNKNOWN_LOGGER_NAME = "unknown.jul.logger";<a name="line.103"></a>
+<span class="sourceLineNo">104</span><a name="line.104"></a>
+<span class="sourceLineNo">105</span>    private static final int TRACE_LEVEL_THRESHOLD = Level.FINEST.intValue();<a name="line.105"></a>
+<span class="sourceLineNo">106</span>    private static final int DEBUG_LEVEL_THRESHOLD = Level.FINE.intValue();<a name="line.106"></a>
+<span class="sourceLineNo">107</span>    private static final int INFO_LEVEL_THRESHOLD = Level.INFO.intValue();<a name="line.107"></a>
+<span class="sourceLineNo">108</span>    private static final int WARN_LEVEL_THRESHOLD = Level.WARNING.intValue();<a name="line.108"></a>
+<span class="sourceLineNo">109</span><a name="line.109"></a>
+<span class="sourceLineNo">110</span>    /**<a name="line.110"></a>
+<span class="sourceLineNo">111</span>     * Adds a SLF4JBridgeHandler instance to jul's root logger.<a name="line.111"></a>
+<span class="sourceLineNo">112</span>     * &lt;p/&gt;<a name="line.112"></a>
+<span class="sourceLineNo">113</span>     * &lt;p/&gt;<a name="line.113"></a>
+<span class="sourceLineNo">114</span>     * This handler will redirect j.u.l. logging to SLF4J. However, only logs enabled<a name="line.114"></a>
+<span class="sourceLineNo">115</span>     * in j.u.l. will be redirected. For example, if a log statement invoking a<a name="line.115"></a>
+<span class="sourceLineNo">116</span>     * j.u.l. logger is disabled, then the corresponding non-event will &lt;em&gt;not&lt;/em&gt;<a name="line.116"></a>
+<span class="sourceLineNo">117</span>     * reach SLF4JBridgeHandler and cannot be redirected.<a name="line.117"></a>
+<span class="sourceLineNo">118</span>     */<a name="line.118"></a>
+<span class="sourceLineNo">119</span>    public static void install() {<a name="line.119"></a>
+<span class="sourceLineNo">120</span>        LogManager.getLogManager().getLogger("").addHandler(new SLF4JBridgeHandler());<a name="line.120"></a>
+<span class="sourceLineNo">121</span>    }<a name="line.121"></a>
+<span class="sourceLineNo">122</span><a name="line.122"></a>
+<span class="sourceLineNo">123</span>    private static java.util.logging.Logger getRootLogger() {<a name="line.123"></a>
+<span class="sourceLineNo">124</span>        return LogManager.getLogManager().getLogger("");<a name="line.124"></a>
+<span class="sourceLineNo">125</span>    }<a name="line.125"></a>
+<span class="sourceLineNo">126</span><a name="line.126"></a>
+<span class="sourceLineNo">127</span>    /**<a name="line.127"></a>
+<span class="sourceLineNo">128</span>     * Removes previously installed SLF4JBridgeHandler instances. See also<a name="line.128"></a>
+<span class="sourceLineNo">129</span>     * {@link #install()}.<a name="line.129"></a>
+<span class="sourceLineNo">130</span>     *<a name="line.130"></a>
+<span class="sourceLineNo">131</span>     * @throws SecurityException A &lt;code&gt;SecurityException&lt;/code&gt; is thrown, if a security manager<a name="line.131"></a>
+<span class="sourceLineNo">132</span>     *                           exists and if the caller does not have<a name="line.132"></a>
+<span class="sourceLineNo">133</span>     *                           LoggingPermission("control").<a name="line.133"></a>
+<span class="sourceLineNo">134</span>     */<a name="line.134"></a>
+<span class="sourceLineNo">135</span>    public static void uninstall() throws SecurityException {<a name="line.135"></a>
+<span class="sourceLineNo">136</span>        java.util.logging.Logger rootLogger = getRootLogger();<a name="line.136"></a>
+<span class="sourceLineNo">137</span>        Handler[] handlers = rootLogger.getHandlers();<a name="line.137"></a>
+<span class="sourceLineNo">138</span>        for (int i = 0; i &lt; handlers.length; i++) {<a name="line.138"></a>
+<span class="sourceLineNo">139</span>            if (handlers[i] instanceof SLF4JBridgeHandler) {<a name="line.139"></a>
+<span class="sourceLineNo">140</span>                rootLogger.removeHandler(handlers[i]);<a name="line.140"></a>
+<span class="sourceLineNo">141</span>            }<a name="line.141"></a>
+<span class="sourceLineNo">142</span>        }<a name="line.142"></a>
+<span class="sourceLineNo">143</span>    }<a name="line.143"></a>
+<span class="sourceLineNo">144</span><a name="line.144"></a>
+<span class="sourceLineNo">145</span>    /**<a name="line.145"></a>
+<span class="sourceLineNo">146</span>     * Returns true if SLF4JBridgeHandler has been previously installed, returns false otherwise.<a name="line.146"></a>
+<span class="sourceLineNo">147</span>     *<a name="line.147"></a>
+<span class="sourceLineNo">148</span>     * @return true if SLF4JBridgeHandler is already installed, false other wise<a name="line.148"></a>
+<span class="sourceLineNo">149</span>     * @throws SecurityException<a name="line.149"></a>
+<span class="sourceLineNo">150</span>     */<a name="line.150"></a>
+<span class="sourceLineNo">151</span>    public static boolean isInstalled() throws SecurityException {<a name="line.151"></a>
+<span class="sourceLineNo">152</span>        java.util.logging.Logger rootLogger = getRootLogger();<a name="line.152"></a>
+<span class="sourceLineNo">153</span>        Handler[] handlers = rootLogger.getHandlers();<a name="line.153"></a>
+<span class="sourceLineNo">154</span>        for (int i = 0; i &lt; handlers.length; i++) {<a name="line.154"></a>
+<span class="sourceLineNo">155</span>            if (handlers[i] instanceof SLF4JBridgeHandler) {<a name="line.155"></a>
+<span class="sourceLineNo">156</span>                return true;<a name="line.156"></a>
+<span class="sourceLineNo">157</span>            }<a name="line.157"></a>
+<span class="sourceLineNo">158</span>        }<a name="line.158"></a>
+<span class="sourceLineNo">159</span>        return false;<a name="line.159"></a>
+<span class="sourceLineNo">160</span>    }<a name="line.160"></a>
+<span class="sourceLineNo">161</span><a name="line.161"></a>
+<span class="sourceLineNo">162</span>    /**<a name="line.162"></a>
+<span class="sourceLineNo">163</span>     * Invoking this method removes/unregisters/detaches all handlers currently attached to the root logger<a name="line.163"></a>
+<span class="sourceLineNo">164</span>     * @since 1.6.5<a name="line.164"></a>
+<span class="sourceLineNo">165</span>     */<a name="line.165"></a>
+<span class="sourceLineNo">166</span>    public static void removeHandlersForRootLogger() {<a name="line.166"></a>
+<span class="sourceLineNo">167</span>        java.util.logging.Logger rootLogger = getRootLogger();<a name="line.167"></a>
+<span class="sourceLineNo">168</span>        java.util.logging.Handler[] handlers = rootLogger.getHandlers();<a name="line.168"></a>
+<span class="sourceLineNo">169</span>        for (int i = 0; i &lt; handlers.length; i++) {<a name="line.169"></a>
+<span class="sourceLineNo">170</span>            rootLogger.removeHandler(handlers[i]);<a name="line.170"></a>
+<span class="sourceLineNo">171</span>        }<a name="line.171"></a>
+<span class="sourceLineNo">172</span>    }<a name="line.172"></a>
+<span class="sourceLineNo">173</span><a name="line.173"></a>
+<span class="sourceLineNo">174</span>    /**<a name="line.174"></a>
+<span class="sourceLineNo">175</span>     * Initialize this handler.<a name="line.175"></a>
+<span class="sourceLineNo">176</span>     */<a name="line.176"></a>
+<span class="sourceLineNo">177</span>    public SLF4JBridgeHandler() {<a name="line.177"></a>
+<span class="sourceLineNo">178</span>    }<a name="line.178"></a>
+<span class="sourceLineNo">179</span><a name="line.179"></a>
+<span class="sourceLineNo">180</span>    /**<a name="line.180"></a>
+<span class="sourceLineNo">181</span>     * No-op implementation.<a name="line.181"></a>
+<span class="sourceLineNo">182</span>     */<a name="line.182"></a>
+<span class="sourceLineNo">183</span>    public void close() {<a name="line.183"></a>
+<span class="sourceLineNo">184</span>        // empty<a name="line.184"></a>
+<span class="sourceLineNo">185</span>    }<a name="line.185"></a>
+<span class="sourceLineNo">186</span><a name="line.186"></a>
+<span class="sourceLineNo">187</span>    /**<a name="line.187"></a>
+<span class="sourceLineNo">188</span>     * No-op implementation.<a name="line.188"></a>
+<span class="sourceLineNo">189</span>     */<a name="line.189"></a>
+<span class="sourceLineNo">190</span>    public void flush() {<a name="line.190"></a>
+<span class="sourceLineNo">191</span>        // empty<a name="line.191"></a>
+<span class="sourceLineNo">192</span>    }<a name="line.192"></a>
+<span class="sourceLineNo">193</span><a name="line.193"></a>
+<span class="sourceLineNo">194</span>    /**<a name="line.194"></a>
+<span class="sourceLineNo">195</span>     * Return the Logger instance that will be used for logging.<a name="line.195"></a>
+<span class="sourceLineNo">196</span>     */<a name="line.196"></a>
+<span class="sourceLineNo">197</span>    protected Logger getSLF4JLogger(LogRecord record) {<a name="line.197"></a>
+<span class="sourceLineNo">198</span>        String name = record.getLoggerName();<a name="line.198"></a>
+<span class="sourceLineNo">199</span>        if (name == null) {<a name="line.199"></a>
+<span class="sourceLineNo">200</span>            name = UNKNOWN_LOGGER_NAME;<a name="line.200"></a>
+<span class="sourceLineNo">201</span>        }<a name="line.201"></a>
+<span class="sourceLineNo">202</span>        return LoggerFactory.getLogger(name);<a name="line.202"></a>
+<span class="sourceLineNo">203</span>    }<a name="line.203"></a>
+<span class="sourceLineNo">204</span><a name="line.204"></a>
+<span class="sourceLineNo">205</span>    protected void callLocationAwareLogger(LocationAwareLogger lal, LogRecord record) {<a name="line.205"></a>
+<span class="sourceLineNo">206</span>        int julLevelValue = record.getLevel().intValue();<a name="line.206"></a>
+<span class="sourceLineNo">207</span>        int slf4jLevel;<a name="line.207"></a>
+<span class="sourceLineNo">208</span><a name="line.208"></a>
+<span class="sourceLineNo">209</span>        if (julLevelValue &lt;= TRACE_LEVEL_THRESHOLD) {<a name="line.209"></a>
+<span class="sourceLineNo">210</span>            slf4jLevel = LocationAwareLogger.TRACE_INT;<a name="line.210"></a>
+<span class="sourceLineNo">211</span>        } else if (julLevelValue &lt;= DEBUG_LEVEL_THRESHOLD) {<a name="line.211"></a>
+<span class="sourceLineNo">212</span>            slf4jLevel = LocationAwareLogger.DEBUG_INT;<a name="line.212"></a>
+<span class="sourceLineNo">213</span>        } else if (julLevelValue &lt;= INFO_LEVEL_THRESHOLD) {<a name="line.213"></a>
+<span class="sourceLineNo">214</span>            slf4jLevel = LocationAwareLogger.INFO_INT;<a name="line.214"></a>
+<span class="sourceLineNo">215</span>        } else if (julLevelValue &lt;= WARN_LEVEL_THRESHOLD) {<a name="line.215"></a>
+<span class="sourceLineNo">216</span>            slf4jLevel = LocationAwareLogger.WARN_INT;<a name="line.216"></a>
+<span class="sourceLineNo">217</span>        } else {<a name="line.217"></a>
+<span class="sourceLineNo">218</span>            slf4jLevel = LocationAwareLogger.ERROR_INT;<a name="line.218"></a>
+<span class="sourceLineNo">219</span>        }<a name="line.219"></a>
+<span class="sourceLineNo">220</span>        String i18nMessage = getMessageI18N(record);<a name="line.220"></a>
+<span class="sourceLineNo">221</span>        lal.log(null, FQCN, slf4jLevel, i18nMessage, null, record.getThrown());<a name="line.221"></a>
+<span class="sourceLineNo">222</span>    }<a name="line.222"></a>
+<span class="sourceLineNo">223</span><a name="line.223"></a>
+<span class="sourceLineNo">224</span>    protected void callPlainSLF4JLogger(Logger slf4jLogger, LogRecord record) {<a name="line.224"></a>
+<span class="sourceLineNo">225</span>        String i18nMessage = getMessageI18N(record);<a name="line.225"></a>
+<span class="sourceLineNo">226</span>        int julLevelValue = record.getLevel().intValue();<a name="line.226"></a>
+<span class="sourceLineNo">227</span>        if (julLevelValue &lt;= TRACE_LEVEL_THRESHOLD) {<a name="line.227"></a>
+<span class="sourceLineNo">228</span>            slf4jLogger.trace(i18nMessage, record.getThrown());<a name="line.228"></a>
+<span class="sourceLineNo">229</span>        } else if (julLevelValue &lt;= DEBUG_LEVEL_THRESHOLD) {<a name="line.229"></a>
+<span class="sourceLineNo">230</span>            slf4jLogger.debug(i18nMessage, record.getThrown());<a name="line.230"></a>
+<span class="sourceLineNo">231</span>        } else if (julLevelValue &lt;= INFO_LEVEL_THRESHOLD) {<a name="line.231"></a>
+<span class="sourceLineNo">232</span>            slf4jLogger.info(i18nMessage, record.getThrown());<a name="line.232"></a>
+<span class="sourceLineNo">233</span>        } else if (julLevelValue &lt;= WARN_LEVEL_THRESHOLD) {<a name="line.233"></a>
+<span class="sourceLineNo">234</span>            slf4jLogger.warn(i18nMessage, record.getThrown());<a name="line.234"></a>
+<span class="sourceLineNo">235</span>        } else {<a name="line.235"></a>
+<span class="sourceLineNo">236</span>            slf4jLogger.error(i18nMessage, record.getThrown());<a name="line.236"></a>
+<span class="sourceLineNo">237</span>        }<a name="line.237"></a>
+<span class="sourceLineNo">238</span>    }<a name="line.238"></a>
+<span class="sourceLineNo">239</span><a name="line.239"></a>
+<span class="sourceLineNo">240</span>    /**<a name="line.240"></a>
+<span class="sourceLineNo">241</span>     * Get the record's message, possibly via a resource bundle.<a name="line.241"></a>
+<span class="sourceLineNo">242</span>     *<a name="line.242"></a>
+<span class="sourceLineNo">243</span>     * @param record<a name="line.243"></a>
+<span class="sourceLineNo">244</span>     * @return<a name="line.244"></a>
+<span class="sourceLineNo">245</span>     */<a name="line.245"></a>
+<span class="sourceLineNo">246</span>    private String getMessageI18N(LogRecord record) {<a name="line.246"></a>
+<span class="sourceLineNo">247</span>        String message = record.getMessage();<a name="line.247"></a>
+<span class="sourceLineNo">248</span><a name="line.248"></a>
+<span class="sourceLineNo">249</span>        if (message == null) {<a name="line.249"></a>
+<span class="sourceLineNo">250</span>            return null;<a name="line.250"></a>
+<span class="sourceLineNo">251</span>        }<a name="line.251"></a>
+<span class="sourceLineNo">252</span><a name="line.252"></a>
+<span class="sourceLineNo">253</span>        ResourceBundle bundle = record.getResourceBundle();<a name="line.253"></a>
+<span class="sourceLineNo">254</span>        if (bundle != null) {<a name="line.254"></a>
+<span class="sourceLineNo">255</span>            try {<a name="line.255"></a>
+<span class="sourceLineNo">256</span>                message = bundle.getString(message);<a name="line.256"></a>
+<span class="sourceLineNo">257</span>            } catch (MissingResourceException e) {<a name="line.257"></a>
+<span class="sourceLineNo">258</span>            }<a name="line.258"></a>
+<span class="sourceLineNo">259</span>        }<a name="line.259"></a>
+<span class="sourceLineNo">260</span>        Object[] params = record.getParameters();<a name="line.260"></a>
+<span class="sourceLineNo">261</span>        // avoid formatting when there are no or 0 parameters. see also<a name="line.261"></a>
+<span class="sourceLineNo">262</span>        // http://jira.qos.ch/browse/SLF4J-203<a name="line.262"></a>
+<span class="sourceLineNo">263</span>        if (params != null &amp;&amp; params.length &gt; 0) {<a name="line.263"></a>
+<span class="sourceLineNo">264</span>            try {<a name="line.264"></a>
+<span class="sourceLineNo">265</span>                message = MessageFormat.format(message, params);<a name="line.265"></a>
+<span class="sourceLineNo">266</span>            } catch (IllegalArgumentException e) {<a name="line.266"></a>
+<span class="sourceLineNo">267</span>                // default to the same behavior as in java.util.logging.Formatter.formatMessage(LogRecord)<a name="line.267"></a>
+<span class="sourceLineNo">268</span>                // see also http://jira.qos.ch/browse/SLF4J-337<a name="line.268"></a>
+<span class="sourceLineNo">269</span>                return message;<a name="line.269"></a>
+<span class="sourceLineNo">270</span>            }<a name="line.270"></a>
+<span class="sourceLineNo">271</span>        }<a name="line.271"></a>
+<span class="sourceLineNo">272</span>        return message;<a name="line.272"></a>
+<span class="sourceLineNo">273</span>    }<a name="line.273"></a>
+<span class="sourceLineNo">274</span><a name="line.274"></a>
+<span class="sourceLineNo">275</span>    /**<a name="line.275"></a>
+<span class="sourceLineNo">276</span>     * Publish a LogRecord.<a name="line.276"></a>
+<span class="sourceLineNo">277</span>     * &lt;p/&gt;<a name="line.277"></a>
+<span class="sourceLineNo">278</span>     * The logging request was made initially to a Logger object, which<a name="line.278"></a>
+<span class="sourceLineNo">279</span>     * initialized the LogRecord and forwarded it here.<a name="line.279"></a>
+<span class="sourceLineNo">280</span>     * &lt;p/&gt;<a name="line.280"></a>
+<span class="sourceLineNo">281</span>     * This handler ignores the Level attached to the LogRecord, as SLF4J cares<a name="line.281"></a>
+<span class="sourceLineNo">282</span>     * about discarding log statements.<a name="line.282"></a>
+<span class="sourceLineNo">283</span>     *<a name="line.283"></a>
+<span class="sourceLineNo">284</span>     * @param record Description of the log event. A null record is silently ignored<a name="line.284"></a>
+<span class="sourceLineNo">285</span>     *               and is not published.<a name="line.285"></a>
+<span class="sourceLineNo">286</span>     */<a name="line.286"></a>
+<span class="sourceLineNo">287</span>    public void publish(LogRecord record) {<a name="line.287"></a>
+<span class="sourceLineNo">288</span>        // Silently ignore null records.<a name="line.288"></a>
+<span class="sourceLineNo">289</span>        if (record == null) {<a name="line.289"></a>
+<span class="sourceLineNo">290</span>            return;<a name="line.290"></a>
+<span class="sourceLineNo">291</span>        }<a name="line.291"></a>
+<span class="sourceLineNo">292</span><a name="line.292"></a>
+<span class="sourceLineNo">293</span>        Logger slf4jLogger = getSLF4JLogger(record);<a name="line.293"></a>
+<span class="sourceLineNo">294</span>        String message = record.getMessage(); // can be null!<a name="line.294"></a>
+<span class="sourceLineNo">295</span>        // this is a check to avoid calling the underlying logging system<a name="line.295"></a>
+<span class="sourceLineNo">296</span>        // with a null message. While it is legitimate to invoke j.u.l. with<a name="line.296"></a>
+<span class="sourceLineNo">297</span>        // a null message, other logging frameworks do not support this.<a name="line.297"></a>
+<span class="sourceLineNo">298</span>        // see also http://jira.qos.ch/browse/SLF4J-99<a name="line.298"></a>
+<span class="sourceLineNo">299</span>        if (message == null) {<a name="line.299"></a>
+<span class="sourceLineNo">300</span>            message = "";<a name="line.300"></a>
+<span class="sourceLineNo">301</span>        }<a name="line.301"></a>
+<span class="sourceLineNo">302</span>        if (slf4jLogger instanceof LocationAwareLogger) {<a name="line.302"></a>
+<span class="sourceLineNo">303</span>            callLocationAwareLogger((LocationAwareLogger) slf4jLogger, record);<a name="line.303"></a>
+<span class="sourceLineNo">304</span>        } else {<a name="line.304"></a>
+<span class="sourceLineNo">305</span>            callPlainSLF4JLogger(slf4jLogger, record);<a name="line.305"></a>
+<span class="sourceLineNo">306</span>        }<a name="line.306"></a>
+<span class="sourceLineNo">307</span>    }<a name="line.307"></a>
+<span class="sourceLineNo">308</span><a name="line.308"></a>
+<span class="sourceLineNo">309</span>}<a name="line.309"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>
