@@ -1,0 +1,150 @@
+ ~~ The MIT License
+ ~~
+ ~~ Copyright (c) 2009 codehaus.org.
+ ~~
+ ~~ Permission is hereby granted, free of charge, to any person obtaining a copy
+ ~~ of this software and associated documentation files (the "Software"), to deal
+ ~~ in the Software without restriction, including without limitation the rights
+ ~~ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ ~~ copies of the Software, and to permit persons to whom the Software is
+ ~~ furnished to do so, subject to the following conditions:
+ ~~
+ ~~ The above copyright notice and this permission notice shall be included in
+ ~~ all copies or substantial portions of the Software.
+ ~~
+ ~~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ~~ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ~~ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ~~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ~~ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ ~~ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ ~~ THE SOFTWARE.
+ ~~
+ 
+ -----
+ Animal Sniffer Annotations
+ -----
+ Stephen Connolly
+ -----
+ 2009-11-03
+ -----
+
+Animal Sniffer Annotations
+
+  Animal Sniffer Annotations provides Java 1.5+ annotations which allow marking methods which Animal Sniffer should 
+  ignore signature violations of.
+
+* Introduction
+
+  Animal Sniffer is designed to detect when you have used classes/methods/fields which are not part of the JRE
+  that you are targetting.  There are certain situations when you might be compiling with a newer JDK than the 
+  JRE you are targetting.  For example newer versions of MacOS do not have JDK 1.5 available and so only JDK 1.6
+  can be used.  Another case is where you are targetting JRE 1.5, but you need to work around some bugs in the
+  JDK 1.5 compiler (there are some well known bugs to do with generics) and so you compile with JDK 1.6.
+  
+  There are some situations where you may want to make use of some of the classes that are available on the newer
+  JRE when your program is executed on the newer JDK.  For example, JDK 1.6 introduced <<<java.awt.SplashScreen>>>.
+  In these cases you would wrap the use of the newer classes inside a <<<try ... catch (LinkageError e)>>> block, e.g.
+  
+---
+...
+import javax.awt.SplashScreen;
+...
+public final class Someclass {
+
+    ...
+
+    public static void main(String[] args) {
+        ...
+        // long running initialization
+        ...
+        try {
+            SplashScreen.getSplashScreen().close();
+        } catch (LinkageError e) {
+            // JDK 5 doesn't display a splash screen, no need to hide it
+        }
+        ...
+    }
+
+    ...
+}
+---
+  
+  The above code will require JDK 1.6 or newer to compile, but will safely run on JRE 1.5. When you run animal-sniffer
+  over the above class with the signatures for JRE 1.5, however, animal sniffer will report a signature failure.
+  
+  Animal Sniffer Annotations provides an out-of-the-box  annotation <<<@IgnoreJRERequirement>>> which you can use
+  to annotate methods which are to be ignored by animal sniffer, e.g.
+
+---
+public final class MapFactory {
+
+    ...
+
+    @IgnoreJRERequirement
+    public ConcurrentMap newConcurrentMap() {
+        try {
+            // Note this map implementation is only available in JRE 1.6+
+            return new ConcurrentSkipListMap();
+        } catch (LinkageError e) {
+            // fall back to JRE 1.5's only concurrent map
+            return new ConcurrentHashMap();
+        }
+    }
+
+    ...
+}
+---
+
+  Note: if you have compiled with the <<<org.jvnet:animal-sniffer-annotation:1.0>>> you do not have to change 
+  anything as animal-sniffer automatically detects this annotation as well (even although it is in a different 
+  package.
+
+  Animal sniffer also allows you to specify your own custom annotation if needed. Check the configuration of
+  the relevant task for more information.
+
+* Using animal-sniffer-annotations in Maven projects
+
+  To annotate your methods, you need to add either an optional and/or provided dependency on 
+  <<<animal-sniffer-annotations>>>, (technically optional is the correct way, but to work around some
+  incorrectly written maven plugins, you may end up using scope provided) e.g.
+
+---
+<project>
+  ...
+  <dependencies>
+    ...
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>${project.artifactId}</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+      <!-- if you are using badly written maven plugins then blame them and add
+      <scope>provided</scope>
+      -->    
+    </dependency>
+    ...
+  </dependencies>
+  ...
+  <build>
+    ...
+    <plugins>
+      ...
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        ...
+        <configuration>
+          ...
+          <source>1.5</source>
+          <target>1.5</target>
+          ...
+        </configuration>
+        ...
+      </plugin>
+      ...
+    </plugins>
+  ...
+</project>
+---
+
+  

@@ -1,0 +1,21 @@
+# Temp Files
+*~
+
+# Bundler
+Gemfile.lock
+
+# Build Output
+**/build_result/
+dist/
+
+# Xcode Generated Files
+**/project.xcworkspace/
+**/xcuserdata/
+**/Translated/
+
+# Mac System Files
+.DS_Store
+
+# IntelliJ IDEA Files
+*.iml
+.idea

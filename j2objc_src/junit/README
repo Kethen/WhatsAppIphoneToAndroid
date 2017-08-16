@@ -1,0 +1,8 @@
+This package creates an Objective-C library of JUnit's core classes. To
+use, create an executable with one or more test classes, linking with the
+"-l junit" flag. Tests are executed by running the binary with one or
+more test and/or test suite class names:
+
+$ j2objc -classpath [j2objc-dist]/lib/junit*.jar FooTest.java BarTest.java
+$ j2objc -o tests FooTest.m BarTest.m -l junit
+$ ./tests org.junit.runner.JUnitCore FooTest BarTest
