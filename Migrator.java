@@ -185,7 +185,7 @@ public class Migrator{
 						subject = result.getString("ZPARTNERNAME");
 					}
 					int archived = result.getInt("ZARCHIVED");
-					long timestamp = (long) Math.floor(1000 * (result.getFloat("ZLASTMESSAGEDATE") + 978307200));
+					long timestamp = nsDateToMilliSecondTimeStamp(result.getFloat("ZLASTMESSAGEDATE"));
 					int lastmsg = result.getInt("ZLASTMESSAGE");
 					ChatListItem row = new ChatListItem(jid, subject, archived, timestamp, lastmsg);
 					if(!row.injectAndroid(android)){
@@ -215,65 +215,86 @@ public class Migrator{
 			result.close();
 			sql.close();
 			sql = iphone.createStatement();
-			result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE, ZSTANZAID FROM ZWAMESSAGE");
+			//result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE, ZSTANZAID FROM ZWAMESSAGE");
+			result = sql.executeQuery("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,\
+			\
+			ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,\
+			\
+			ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,\
+			\
+			ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY \
+			\
+			FROM ZWAMESSAGE \
+			\
+			LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK \
+			\
+			LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK \
+			\
+			LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE");
+			//"SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"
+			//"SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?"
+			//"SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?"
 			// file counter
 			int fileCount = 0;
-			int current = 0;
+			int current = 2;
 			System.out.println("begin message migration");
 			while(result.next()){
 				// common items
-				int id = result.getInt("Z_PK");
+				//int id = result.getInt("Z_PK");
+				int id = current;
 				String remoteResource = null;
-				int groupMember = result.getInt("ZGROUPMEMBER");
+				int groupMember = result.getInt("ZWAGROUPMEMBER.Z_PK"/*"ZGROUPMEMBER"*/);
 				PreparedStatement sql2;
 				ResultSet result2;
 				if(groupMember != 0){
-					sql2 = iphone.prepareStatement("SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?");
-					sql2.setInt(1, groupMember);
-					result2 = sql2.executeQuery();
-					if(result2.next()){
-						remoteResource = result2.getString("ZMEMBERJID");
-					}
-					result2.close();
-					sql2.close();
+					//sql2 = iphone.prepareStatement("SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?");
+					//sql2.setInt(1, groupMember);
+					//result2 = sql2.executeQuery();
+					//if(result2.next()){
+						//remoteResource = result2.getString("ZMEMBERJID");
+					//}
+					//result2.close();
+					//sql2.close();
+					remoteResource = result.getString("ZWAGROUPMEMBER.ZMEMBERJID");
 				}
-				long msgDate = (long)Math.floor(1000 * (result.getFloat("ZMESSAGEDATE") + 978307200));
-				int fromMe = result.getInt("ZISFROMME");
+				long msgDate = nsDateToMilliSecondTimeStamp(result.getFloat("ZWAMESSAGE.ZMESSAGEDATE"/*"ZMESSAGEDATE"*/));
+				int fromMe = result.getInt("ZWAMESSAGE.ZISFROMME"/*"ZISFROMME"*/);
 				String jid;
 				if(fromMe == 1){
-					jid = result.getString("ZTOJID");
+					jid = result.getString("ZWAMESSAGE.ZTOJID"/*"ZTOJID"*/);
 				}else{
-					jid = result.getString("ZFROMJID");
+					jid = result.getString("ZWAMESSAGE.ZFROMJID"/*"ZFROMJID"*/);
 				}
-				String keyId = result.getString("ZSTANZAID");
+				String keyId = result.getString("ZWAMESSAGE.ZSTANZAID"/*"ZSTANZAID"*/);
 				String data = null;
 				String mediaCaption = null;
 				String mediaName = null;
 				int mediaDuration = 0;
 				byte[] thumbImage = null;
-				int mediaWaType = result.getInt("ZMESSAGETYPE");
+				int mediaWaType = result.getInt("ZWAMESSAGE.ZMESSAGETYPE"/*"ZMESSAGETYPE"*/);
 				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
 					String mediaMimeType = null;
 					float longitude = 0;
 					float latitude = 0;
-					int mediaItemId = result.getInt("ZMEDIAITEM");
-					sql2 = iphone.prepareStatement("SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?");
+					int mediaItemId = result.getInt("ZWAMEDIAITEM.Z_PK"/*"ZMEDIAITEM"*/);
+					/*sql2 = iphone.prepareStatement("SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?");
 					sql2.setInt(1, result.getInt("Z_PK"));
 					result2 = sql2.executeQuery();
 					// the sent message is a link
-					if(result2.next()){
-						data = result.getString("ZTEXT");
-						mediaCaption = result2.getString("ZTITLE");
-						mediaName = result2.getString("ZSUMMARY");
-						result2.close();
-						sql2.close();
+					if(result2.next()){*/
+					if(result.getInt("ZWAMESSAGEDATAITEM.Z_PK") != 0)
+						data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+						mediaCaption = result.getString("ZWAMESSAGEDATAITEM.ZTITLE") /*result2.getString("ZTITLE")*/;
+						mediaName = result.getString("ZWAMESSAGEDATAITEM.ZSUMMARY") /*result2.getString("ZSUMMARY")*/;
+						//result2.close();
+						//sql2.close();
 						mediaWaType = -1; // actually for injecting
 					}
 					// the sent message is just a text message
 					else if(mediaWaType == 0){
 						result2.close();
 						sql2.close();
-						data = result.getString("ZTEXT");
+						data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
 						// property list reading:
 						// 1. check if we have a ZMEDIAITEM
 						// 2. obtain record with Z_PK in ZWAMEDIAITEM
@@ -299,31 +320,31 @@ public class Migrator{
 					else if(mediaItemId != 0){
 						result2.close();
 						sql2.close();
-						sql2 = iphone.prepareStatement("SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"); // longitude -> width, latitude -> height
-						sql2.setInt(1, mediaItemId);
-						result2 = sql2.executeQuery();
-						if(result2.next()){
-							String vcardString = result2.getString("ZVCARDSTRING");
-							String localMediaPath = result2.getString("ZMEDIALOCALPATH");
+						//sql2 = iphone.prepareStatement("SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"); // longitude -> width, latitude -> height
+						//sql2.setInt(1, mediaItemId);
+						//result2 = sql2.executeQuery();
+						//if(result2.next()){
+							String vcardString = result.getString("ZWAMEDIAITEM.ZVCARDSTRING") /*result2.getString("ZVCARDSTRING")*/;
+							String localMediaPath = result.getString("ZWAMEDIAITEM.ZMEDIALOCALPATH") /*result2.getString("ZMEDIALOCALPATH")*/;
 							// the media is a vcard
 							if(mediaWaType == 4){
 								data = vcardString;
-								mediaName = result2.getString("ZVCARDNAME");
+								mediaName = result.getString("ZWAMEDIAITEM.ZVCARDNAME") /*result2.getString("ZVCARDNAME")*/;
 								//mediaWaType = 4;
 							}
 							// the media is a location
 							else if(mediaWaType == 5){
 								// stub ish, not enough iphone location sample
-								data = result.getString("ZTEXT");
-								longitude = result2.getFloat("ZLONGITUDE");
-								latitude = result2.getFloat("ZLATITUDE");
+								data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+								longitude = result.getFloat("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getFloat("ZLONGITUDE")*/;
+								latitude = result.getFloat("ZWAMEDIAITEM.ZLATITUDE")/*result2.getFloat("ZLATITUDE")*/;
 							}
 							// the media is a media
 							else{
 								// common components
 								mediaMimeType = vcardString;
-								mediaCaption = result2.getString("ZTITLE");
-								mediaDuration = result2.getInt("ZMOVIEDURATION");
+								mediaCaption = result.getString("ZWAMEDIAITEM.ZTITLE")/*result2.getString("ZTITLE")*/;
+								mediaDuration = result.getInt("ZWAMEDIAITEM.ZMOVIEDURATION")/*result2.getInt("ZMOVIEDURATION")*/;
 								// copy the file
 								String fileExtension = null;
 								if(localMediaPath != null){
@@ -355,7 +376,7 @@ public class Migrator{
 								}else{
 									crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
 								}
-								crafted.fileSize = result2.getInt("ZFILESIZE");
+								crafted.fileSize = result.getInt("ZWAMEDIAITEM.ZFILESIZE")/*result2.getInt("ZFILESIZE")*/;
 								crafted.suspiciousContent = 0;
 								if(mediaWaType == 3){
 									crafted.faceX = 0;
@@ -375,8 +396,8 @@ public class Migrator{
 								crafted.iv = new byte[3];
 								Arrays.fill(crafted.iv, (byte) 'A');
 								crafted.failErrorCode = 0;
-								crafted.width = result2.getInt("ZLONGITUDE");
-								crafted.height = result2.getInt("ZLATITUDE");
+								crafted.width = result.getInt("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getInt("ZLONGITUDE")*/;
+								crafted.height = result.getInt("ZWAMEDIAITEM.ZLATITUDE") /*result2.getInt("ZLATITUDE")*/;
 								crafted.doodleId = "Does it really matter?";
 								crafted.gifAttribution = 0;
 								crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
@@ -391,7 +412,7 @@ public class Migrator{
 								// media is a document
 								if(mediaWaType == 8){
 									mediaWaType = 9;
-									String fileName = result.getString("ZTEXT");
+									String fileName = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
 									mediaName = fileName;
 									if(fileName != null){
 										String[] splitted;
@@ -416,7 +437,7 @@ public class Migrator{
 									mediaWaType = 1;
 								}
 							}
-						}
+						//}
 					}
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
@@ -429,7 +450,7 @@ public class Migrator{
 				}
 				current++;
 				System.out.print("\r");
-				System.out.print("messages added: " + current + "/" + numberOfMessage);
+				System.out.print("messages added: " + (current - 2) + "/" + numberOfMessage);
 			}
 			System.out.println("");
 			result.close();
@@ -452,5 +473,9 @@ public class Migrator{
 		}
 		Migrator instance = new Migrator();
 		instance.standardFlow(param[0], param[1], param[2]);
+	}
+	// helper functions
+	public static long nsDateToMilliSecondTimeStamp(float in){
+		return (long) Math.floor(1000 * (in + 978307200));
 	}
 }

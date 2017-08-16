@@ -110,8 +110,16 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			sql.setString(15, key_id);
 			sql.setFloat(16, longitude);
 			sql.setFloat(17, latitude);
-			sql.setInt(18, quoted_row_id);
-			sql.setString(19, mentioned_jids);
+			if(quoted_row_id != 0){
+				sql.setInt(18, quoted_row_id);
+			}else{
+				sql.setNull(18, Types.INTEGER);
+			}
+			if(mentioned_jids != NULL){
+				sql.setString(19, mentioned_jids);
+			}else{
+				sql.setNull(19, Types.VARCHAR);
+			}
 			sql.execute();
 			sql.close();
 			if(link){
