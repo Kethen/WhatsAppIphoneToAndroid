@@ -185,7 +185,7 @@ public class Migrator{
 						subject = result.getString("ZPARTNERNAME");
 					}
 					int archived = result.getInt("ZARCHIVED");
-					long timestamp = nsDateToMilliSecondTimeStamp(result.getFloat("ZLASTMESSAGEDATE"));
+					long timestamp = MessageItem.nsDateToMilliSecondTimeStamp(result.getFloat("ZLASTMESSAGEDATE"));
 					int lastmsg = result.getInt("ZLASTMESSAGE");
 					ChatListItem row = new ChatListItem(jid, subject, archived, timestamp, lastmsg);
 					if(!row.injectAndroid(android)){
@@ -216,21 +216,21 @@ public class Migrator{
 			sql.close();
 			sql = iphone.createStatement();
 			//result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE, ZSTANZAID FROM ZWAMESSAGE");
-			result = sql.executeQuery("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,\
-			\
-			ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,\
-			\
-			ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,\
-			\
-			ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY \
-			\
-			FROM ZWAMESSAGE \
-			\
-			LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK \
-			\
-			LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK \
-			\
-			LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE");
+			result = sql.executeQuery("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,"
+			+
+			"ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,"
+			+
+			"ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,"
+			+
+			"ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY"
+			+
+			"FROM ZWAMESSAGE"
+			+
+			"LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK"
+			+
+			"LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK"
+			+
+			"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE");
 			//"SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"
 			//"SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?"
 			//"SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?"
@@ -244,8 +244,74 @@ public class Migrator{
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
 					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
+					// copy the file
+					String localMediaPath = result.getString("ZWAMEDIAITEM.ZMEDIALOCALPATH");
+					String fileExtension = null;
+					if(localMediaPath != null){
+						String[] splitted = localMediaPath.split("\\.");
+						if(splitted.length == 0){
+							System.out.println("sum ting wong with ZMEDIALOCALPATH");
+							System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
+							return false;
+						}
+						fileExtension = splitted[splitted.length - 1];
+						FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
+						FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
+						BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
+						BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+						byte[] copyBuffer = new byte[1024];
+						int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+						while(readSize != -1){
+							bufferedOutFile.write(copyBuffer, 0, readSize);
+							readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+						}
+						bufferedInFile.close();
+						bufferedOutFile.close();
+					}
+					// craft a com.whatsapp.MediaData object
+					byte[] thumbImage = null;
+					MediaData crafted = new MediaData();
+					crafted.transferred = true;
+					if(localMediaPath != null){
+						crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+					}else{
+						crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
+					}
+					crafted.fileSize = result.getInt("ZWAMEDIAITEM.ZFILESIZE")/*result2.getInt("ZFILESIZE")*/;
+					crafted.suspiciousContent = 0;
+					if(mediaWaType == 3){
+						crafted.faceX = 0;
+						crafted.faceY = 0;
+					}else{
+						crafted.faceX = -1;
+						crafted.faceY = -1;
+					}
+					crafted.mediaKey = new byte[3];
+					Arrays.fill(crafted.mediaKey, (byte) 'A');
+					crafted.refKey = new byte[3];
+					Arrays.fill(crafted.refKey, (byte) 'A');
+					crafted.cipherKey = new byte[3];
+					Arrays.fill(crafted.cipherKey, (byte) 'A');
+					crafted.hmacKey = new byte[3];
+					Arrays.fill(crafted.hmacKey, (byte) 'A');
+					crafted.iv = new byte[3];
+					Arrays.fill(crafted.iv, (byte) 'A');
+					crafted.failErrorCode = 0;
+					crafted.width = result.getInt("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getInt("ZLONGITUDE")*/;
+					crafted.height = result.getInt("ZWAMEDIAITEM.ZLATITUDE") /*result2.getInt("ZLATITUDE")*/;
+					crafted.doodleId = "Does it really matter?";
+					crafted.gifAttribution = 0;
+					crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
+					crafted.uploadRetry = false;
+					fileCount++;
+					// serialize the object
+					ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
+					ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
+					objectOutput.writeObject(crafted);
+					objectOutput.close();
+					thumbImage = craftedBuffer.toByteArray();
 					MessageItem message = new MessageItem();
-					if(!message.populateFromResult(iphone, result, current)){
+					if(!message.populateFromResult(iphone, result, current, true, thumbImage)){
 						System.out.println("loading message failed");
 						return false;
 					}
@@ -273,6 +339,14 @@ public class Migrator{
 		return loadIphoneDb(iphoneDb) && openIphoneFolder(iphoneFolder) && createAndroidFolder(androidFolder) && createAndroidDb(androidFolder + "WhatsApp/Databases/msgstore.db") /*loadAndroidDb("template.db", androidFolder + "WhatsApp/Databases/msgstore.db")*/ && iphone2Android() && closeAndroidDb() && closeIphoneDb() ? true : false;
 	}
 	public static void main(String[] param){
+		// register sqlite jdbc driver
+		try{
+			Class sqliteDriver = Class.forName("org.sqlite.JDBC");
+		}catch(Exception ex){
+			System.out.println("failed loading sqlite driver");
+			System.out.println(ex.getMessage());
+			ex.printStackTrace();
+		}
 		if(param.length != 3){
 			System.out.println("Usage: java -jar whatsappi2a.jar <iphone database> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
 			return;
