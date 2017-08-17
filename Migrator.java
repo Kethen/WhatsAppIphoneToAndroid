@@ -299,7 +299,7 @@ public class Migrator{
 				System.out.print("\r");
 				System.out.print("messages added: " + current + "/" + numberOfMessage);
 			}
-			System.out.println("done!");
+			System.out.println("\ndone!");
 			result.close();
 			sql.close();
 		}catch(Exception ex){

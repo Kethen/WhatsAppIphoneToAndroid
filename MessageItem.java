@@ -266,7 +266,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 												}
 											}
 										}
-										if(thirdLayer != null && mentions){
+										// temporarily disabled
+										if(thirdLayer != null && mentions && false){
 											while(thirdLayerFinder.hasNext()){
 												thirdLayer = thirdLayerFinder.next();
 												if(thirdLayer.getName().equals("string")){
