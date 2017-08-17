@@ -244,8 +244,12 @@ public class Migrator{
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
 					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
-					MessageItem message = new MessageItem(android, result, current);
-					if(!message.injectAndroid(android, false)){
+					MessageItem message = new MessageItem();
+					if(!message.populateFromResult(iphone, result, current)){
+						System.out.println("loading message failed");
+						return false;
+					}
+					if(message.injectAndroid(android, false) == -1){
 						System.out.println("insert message failed");
 						return false;
 					}

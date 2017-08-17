@@ -10,7 +10,11 @@ import com.whatsapp.MediaData;
 import java.io.*;
 import nl.pvanassen.bplist.converter.ConvertToXml;
 import nl.pvanassen.bplist.ext.nanoxml.XMLElement;
-
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
+import java.util.*;
 public class MessageItem{ // messages <- ZWAMESSAGE
 	int id; // _id <- Z_PK
 	String key_id;
@@ -35,8 +39,9 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	float latitude;
 	int quoted_row_id;
 	String mentioned_jids;
+	MessageItem quote;
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, int quoted_row_id, String mentioned_jids){
+	public MessageItem(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, int quoted_row_id, String mentioned_jids, MessageItem quote){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		this.id = id;
@@ -57,210 +62,340 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.quoted_row_id = quoted_row_id;
 		this.mentioned_jids = mentioned_jids;
 	}
-
-	public MessageItem(Connection android, ResultSet result, int id){
-		String remoteResource = null;
-		int groupMember = result.getInt("ZWAGROUPMEMBER.Z_PK"/*"ZGROUPMEMBER"*/);
-		PreparedStatement sql2;
-		ResultSet result2;
-		if(groupMember != 0){
-			//sql2 = iphone.prepareStatement("SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?");
-			//sql2.setInt(1, groupMember);
-			//result2 = sql2.executeQuery();
+	public MessageItem(){
+		return;
+	}
+	public boolean populateFromResult(Connection android, ResultSet result, int id){
+		try{
+			String remoteResource = null;
+			int groupMember = result.getInt("ZWAGROUPMEMBER.Z_PK"/*"ZGROUPMEMBER"*/);
+			PreparedStatement sql2;
+			ResultSet result2;
+			if(groupMember != 0){
+				//sql2 = iphone.prepareStatement("SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?");
+				//sql2.setInt(1, groupMember);
+				//result2 = sql2.executeQuery();
 			//if(result2.next()){
 				//remoteResource = result2.getString("ZMEMBERJID");
 			//}
 			//result2.close();
 			//sql2.close();
 			remoteResource = result.getString("ZWAGROUPMEMBER.ZMEMBERJID");
-		}
-		long msgDate = nsDateToMilliSecondTimeStamp(result.getFloat("ZWAMESSAGE.ZMESSAGEDATE"/*"ZMESSAGEDATE"*/));
-		int fromMe = result.getInt("ZWAMESSAGE.ZISFROMME"/*"ZISFROMME"*/);
-		String jid;
-		if(fromMe == 1){
-			jid = result.getString("ZWAMESSAGE.ZTOJID"/*"ZTOJID"*/);
-		}else{
-			jid = result.getString("ZWAMESSAGE.ZFROMJID"/*"ZFROMJID"*/);
-		}
-		String keyId = result.getString("ZWAMESSAGE.ZSTANZAID"/*"ZSTANZAID"*/);
-		String data = null;
-		String mediaCaption = null;
-		String mediaName = null;
-		int mediaDuration = 0;
-		byte[] thumbImage = null;
-		String mediaMimeType = null;
-		float longitude = 0;
-		float latitude = 0;
-		int mediaItemId = result.getInt("ZWAMEDIAITEM.Z_PK"/*"ZMEDIAITEM"*/);
-		/*sql2 = iphone.prepareStatement("SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?");
-		sql2.setInt(1, result.getInt("Z_PK"));
-		result2 = sql2.executeQuery();
-		// the sent message is a link
-		if(result2.next()){*/
-		if(result.getInt("ZWAMESSAGEDATAITEM.Z_PK") != 0)
-			data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-			mediaCaption = result.getString("ZWAMESSAGEDATAITEM.ZTITLE") /*result2.getString("ZTITLE")*/;
-			mediaName = result.getString("ZWAMESSAGEDATAITEM.ZSUMMARY") /*result2.getString("ZSUMMARY")*/;
-			//result2.close();
-			//sql2.close();
-			mediaWaType = -1; // actually for injecting
-		}
-		// the sent message is just a text message
-		else if(mediaWaType == 0){
-			result2.close();
-			sql2.close();
-			data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-		}
-		// the sent message is a media
-		else if(mediaItemId != 0){
-			result2.close();
-			sql2.close();
-			//sql2 = iphone.prepareStatement("SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"); // longitude -> width, latitude -> height
-			//sql2.setInt(1, mediaItemId);
-			//result2 = sql2.executeQuery();
-			//if(result2.next()){
-			String vcardString = result.getString("ZWAMEDIAITEM.ZVCARDSTRING") /*result2.getString("ZVCARDSTRING")*/;
-			String localMediaPath = result.getString("ZWAMEDIAITEM.ZMEDIALOCALPATH") /*result2.getString("ZMEDIALOCALPATH")*/;
-			// the media is a vcard
-			if(mediaWaType == 4){
-				data = vcardString;
-				mediaName = result.getString("ZWAMEDIAITEM.ZVCARDNAME") /*result2.getString("ZVCARDNAME")*/;
-				//mediaWaType = 4;
 			}
-			// the media is a location
-			else if(mediaWaType == 5){
-				// stub ish, not enough iphone location sample
+			long msgDate = nsDateToMilliSecondTimeStamp(result.getFloat("ZWAMESSAGE.ZMESSAGEDATE"/*"ZMESSAGEDATE"*/));
+			int fromMe = result.getInt("ZWAMESSAGE.ZISFROMME"/*"ZISFROMME"*/);
+			String jid;
+			if(fromMe == 1){
+				jid = result.getString("ZWAMESSAGE.ZTOJID"/*"ZTOJID"*/);
+			}else{
+				jid = result.getString("ZWAMESSAGE.ZFROMJID"/*"ZFROMJID"*/);
+			}
+			String keyId = result.getString("ZWAMESSAGE.ZSTANZAID"/*"ZSTANZAID"*/);
+			String data = null;
+			String mediaCaption = null;
+			String mediaName = null;
+			int mediaDuration = 0;
+			byte[] thumbImage = null;
+			String mediaMimeType = null;
+			float longitude = 0;
+			float latitude = 0;
+			//int mediaItemId = result.getInt("ZWAMEDIAITEM.Z_PK"/*"ZMEDIAITEM"*/);
+			/*sql2 = iphone.prepareStatement("SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?");
+			sql2.setInt(1, result.getInt("Z_PK"));
+			result2 = sql2.executeQuery();
+			// the sent message is a link
+			if(result2.next()){*/
+			if(result.getInt("ZWAMESSAGEDATAITEM.Z_PK") != 0)
 				data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-				longitude = result.getFloat("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getFloat("ZLONGITUDE")*/;
-				latitude = result.getFloat("ZWAMEDIAITEM.ZLATITUDE")/*result2.getFloat("ZLATITUDE")*/;
+				mediaCaption = result.getString("ZWAMESSAGEDATAITEM.ZTITLE") /*result2.getString("ZTITLE")*/;
+				mediaName = result.getString("ZWAMESSAGEDATAITEM.ZSUMMARY") /*result2.getString("ZSUMMARY")*/;
+				//result2.close();
+				//sql2.close();
+				mediaWaType = -1; // actually for injecting
 			}
-			// the media is a media
-			else{
-				// common components
-				mediaMimeType = vcardString;
-				mediaCaption = result.getString("ZWAMEDIAITEM.ZTITLE")/*result2.getString("ZTITLE")*/;
-				mediaDuration = result.getInt("ZWAMEDIAITEM.ZMOVIEDURATION")/*result2.getInt("ZMOVIEDURATION")*/;
-				// copy the file
-				String fileExtension = null;
-				if(localMediaPath != null){
-					String[] splitted = localMediaPath.split("\\.");
-					if(splitted.length == 0){
-						System.out.println("sum ting wong with ZMEDIALOCALPATH");
-						System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
-						return false;
+			// the sent message is just a text message
+			else if(mediaWaType == 0){
+				result2.close();
+				sql2.close();
+				data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+			}
+			// the sent message is a media
+			else if(result.getInt("ZWAMEDIAITEM.Z_PK"/*"ZMEDIAITEM"*/) != 0){
+				result2.close();
+				sql2.close();
+				//sql2 = iphone.prepareStatement("SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"); // longitude -> width, latitude -> height
+				//sql2.setInt(1, mediaItemId);
+				//result2 = sql2.executeQuery();
+				//if(result2.next()){
+				String vcardString = result.getString("ZWAMEDIAITEM.ZVCARDSTRING") /*result2.getString("ZVCARDSTRING")*/;
+				String localMediaPath = result.getString("ZWAMEDIAITEM.ZMEDIALOCALPATH") /*result2.getString("ZMEDIALOCALPATH")*/;
+				// the media is a vcard
+				if(mediaWaType == 4){
+					data = vcardString;
+					mediaName = result.getString("ZWAMEDIAITEM.ZVCARDNAME") /*result2.getString("ZVCARDNAME")*/;
+					//mediaWaType = 4;
+				}
+				// the media is a location
+				else if(mediaWaType == 5){
+					// stub ish, not enough iphone location sample
+					data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+					longitude = result.getFloat("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getFloat("ZLONGITUDE")*/;
+					latitude = result.getFloat("ZWAMEDIAITEM.ZLATITUDE")/*result2.getFloat("ZLATITUDE")*/;
+				}
+				// the media is a media
+				else{
+					// common components
+					mediaMimeType = vcardString;
+					mediaCaption = result.getString("ZWAMEDIAITEM.ZTITLE")/*result2.getString("ZTITLE")*/;
+					mediaDuration = result.getInt("ZWAMEDIAITEM.ZMOVIEDURATION")/*result2.getInt("ZMOVIEDURATION")*/;
+					// copy the file
+					String fileExtension = null;
+					if(localMediaPath != null){
+						String[] splitted = localMediaPath.split("\\.");
+						if(splitted.length == 0){
+							System.out.println("sum ting wong with ZMEDIALOCALPATH");
+							System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
+							return false;
+						}
+						fileExtension = splitted[splitted.length - 1];
+						FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
+						FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
+						BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
+						BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+						byte[] copyBuffer = new byte[1024];
+						int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+						while(readSize != -1){
+							bufferedOutFile.write(copyBuffer, 0, readSize);
+							readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+						}
+						bufferedInFile.close();
+						bufferedOutFile.close();
 					}
-					fileExtension = splitted[splitted.length - 1];
-					FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
-					FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
-					BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
-					BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
-					byte[] copyBuffer = new byte[1024];
-					int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-					while(readSize != -1){
-						bufferedOutFile.write(copyBuffer, 0, readSize);
-						readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+					// craft a com.whatsapp.MediaData object
+					MediaData crafted = new MediaData();
+					crafted.transferred = true;
+					if(localMediaPath != null){
+						crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+					}else{
+						crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
 					}
-					bufferedInFile.close();
-					bufferedOutFile.close();
+					crafted.fileSize = result.getInt("ZWAMEDIAITEM.ZFILESIZE")/*result2.getInt("ZFILESIZE")*/;
+					crafted.suspiciousContent = 0;
+					if(mediaWaType == 3){
+						crafted.faceX = 0;
+						crafted.faceY = 0;
+					}else{
+						crafted.faceX = -1;
+						crafted.faceY = -1;
+					}
+					crafted.mediaKey = new byte[3];
+					Arrays.fill(crafted.mediaKey, (byte) 'A');
+					crafted.refKey = new byte[3];
+					Arrays.fill(crafted.refKey, (byte) 'A');
+					crafted.cipherKey = new byte[3];
+					Arrays.fill(crafted.cipherKey, (byte) 'A');
+					crafted.hmacKey = new byte[3];
+					Arrays.fill(crafted.hmacKey, (byte) 'A');
+					crafted.iv = new byte[3];
+					Arrays.fill(crafted.iv, (byte) 'A');
+					crafted.failErrorCode = 0;
+					crafted.width = result.getInt("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getInt("ZLONGITUDE")*/;
+					crafted.height = result.getInt("ZWAMEDIAITEM.ZLATITUDE") /*result2.getInt("ZLATITUDE")*/;
+					crafted.doodleId = "Does it really matter?";
+					crafted.gifAttribution = 0;
+					crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
+					crafted.uploadRetry = false;
+					fileCount++;
+					// serialize the object
+					ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
+					ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
+					objectOutput.writeObject(crafted);
+					objectOutput.close();
+					thumbImage = craftedBuffer.toByteArray();
+					// media is a document
+					if(mediaWaType == 8){
+						mediaWaType = 9;
+						String fileName = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+						mediaName = fileName;
+						if(fileName != null){
+							String[] splitted;
+							splitted = fileName.split("\\.");
+							if(splitted.length > 1){
+								mediaCaption = fileName.substring(0, fileName.length() - splitted[splitted.length - 1].length() - 1);
+							}else{
+								mediaCaption = fileName;
+							}
+						}
+					}
+					// media is an audio
+					else if(vcardString != null && vcardString.indexOf("audio") == 0){
+						mediaWaType = 2;
+					}
+					// media is a video
+					else if(vcardString != null && vcardString.indexOf("video") == 0){
+						mediaWaType = 3;
+					}
+					// media is an image
+					else if(vcardString != null && vcardString.indexOf("image") == 0){
+						mediaWaType = 1;
+					}
 				}
-				// craft a com.whatsapp.MediaData object
-				MediaData crafted = new MediaData();
-				crafted.transferred = true;
-				if(localMediaPath != null){
-					crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
-				}else{
-					crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
+				//}
+			}
+			// parse bplist
+			int quotedRowId = 0; // actually handled later
+			String mentionedJids = null;
+			MessageItem quotedMessage = null;
+			byte[] bplist = result.getBytes("ZWAMEDIAITEM.ZMETADATA");
+			if(bplist != null){
+				FileSystem tempfs = Jimfs.newFileSystem(Configuration.unix());
+				Path xmlFilePath = tempfs.getPath("/bpl");
+				File xmlFile = xmlFilePath.toFile();
+				FileOutputStream xmlWrite = new FileOutputStream(xmlFile);
+				xmlWrite.write(bplist, 0, bplist.length);
+				xmlWrite.close();
+				ConvertToXml converter = new ConvertToXml();
+				XMLElement xml = converter.convertToXml(xmlFile);
+				// 1. traverse to the first dict element
+				Iterator<XMLElement> firstLayerFinder = xml.iterateChildren();
+				XMLElement firstLayer = null;
+				while(firstLayerFinder.hasNext()){
+					XMLElement temp = firstLayerFinder.next();
+					if(temp.getName().equals("dict")){
+						firstLayer = temp;
+						break;
+					}
 				}
-				crafted.fileSize = result.getInt("ZWAMEDIAITEM.ZFILESIZE")/*result2.getInt("ZFILESIZE")*/;
-				crafted.suspiciousContent = 0;
-				if(mediaWaType == 3){
-					crafted.faceX = 0;
-					crafted.faceY = 0;
-				}else{
-					crafted.faceX = -1;
-					crafted.faceY = -1;
-				}
-				crafted.mediaKey = new byte[3];
-				Arrays.fill(crafted.mediaKey, (byte) 'A');
-				crafted.refKey = new byte[3];
-				Arrays.fill(crafted.refKey, (byte) 'A');
-				crafted.cipherKey = new byte[3];
-				Arrays.fill(crafted.cipherKey, (byte) 'A');
-				crafted.hmacKey = new byte[3];
-				Arrays.fill(crafted.hmacKey, (byte) 'A');
-				crafted.iv = new byte[3];
-				Arrays.fill(crafted.iv, (byte) 'A');
-				crafted.failErrorCode = 0;
-				crafted.width = result.getInt("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getInt("ZLONGITUDE")*/;
-				crafted.height = result.getInt("ZWAMEDIAITEM.ZLATITUDE") /*result2.getInt("ZLATITUDE")*/;
-				crafted.doodleId = "Does it really matter?";
-				crafted.gifAttribution = 0;
-				crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
-				crafted.uploadRetry = false;
-				fileCount++;
-				// serialize the object
-				ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
-				ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
-				objectOutput.writeObject(crafted);
-				objectOutput.close();
-				thumbImage = craftedBuffer.toByteArray();
-				// media is a document
-				if(mediaWaType == 8){
-					mediaWaType = 9;
-					String fileName = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-					mediaName = fileName;
-					if(fileName != null){
-						String[] splitted;
-						splitted = fileName.split("\\.");
-						if(splitted.length > 1){
-							mediaCaption = fileName.substring(0, fileName.length() - splitted[splitted.length - 1].length() - 1);
-						}else{
-							mediaCaption = fileName;
+				// 2. traverse to the first array element
+				if(firstLayer != null){
+					XMLElement secondLayer = null;
+					Iterator<XMLElement> secondLayerFinder = firstLayer.iterateChildren();
+					while(secondLayerFinder.hasNext()){
+						XMLElement temp = secondLayerFinder.next();
+						if(temp.getName().equals("array")){
+							secondLayer = temp;
+							break;
+						}
+					}
+				// 3. traverse to the first dict element
+					if(secondLayer != null){
+						XMLElement thirdLayer = null;
+						Iterator<XMLElement> thirdLayerFinder = secondLayer.iterateChildren();
+						while(thirdLayerFinder.hasNext()){
+							XMLElement temp = thirdLayerFinder.next();
+							if(temp.getName().equals("dict")){
+								thirdLayer = temp;
+								break;
+							}
+						}
+				// 4. traverse through the key elements, check UID element after mentions and quotedMessageData
+						if(thirdLayer != null){
+							Iterator<XMLElement> keyFinder = thirdLayer.iterateChildren();
+							boolean mentions = false;
+							boolean quotedMessageData = false;
+							while(keyFinder.hasNext()){
+								XMLElement temp = keyFinder.next();
+								if(temp.getName().equals("key") && temp.getContent().equals("mentions")){
+									if(keyFinder.hasNext()){
+										temp = keyFinder.next();
+										if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
+											mentions = true;
+										}
+									}
+								}else if(temp.getName().equals("key") && temp.getContent().equals("quotedMessageData")){
+									if(keyFinder.hasNext()){
+										temp = keyFinder.next();
+										if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
+											quotedMessageData = true;
+										}
+									}
+								}
+							}
+				// 5. leave the dict element, to the first string element after
+							if(mentions || quotedMessageData){
+								thirdLayer = null;
+								while(thirdLayerFinder.hasNext()){
+									XMLElement temp = thirdLayerFinder.next();
+									if(temp.getName().equals("string")){
+										thirdLayer = temp;
+										break;
+									}
+								}
+								if(thirdLayer != null && quotedMessageData){
+									String quotedMessageKeyId = thirdLayer.getContent();
+									PreparedStatement sql = iphone.prepareStatement("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,\
+									\
+									ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,\
+									\
+									ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,\
+									\
+									ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY \
+									\
+									FROM ZWAMESSAGE \
+									\
+									LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK \
+									\
+									LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK \
+									\
+									LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE\
+									\
+									WHERE ZWAMESSAGE.ZSTANZAID = ?");
+									sql.setString(quotedMessageKeyId);
+									ResultSet result2 = sql.executeQuery();
+									if(result.next()){
+										quotedMessage = new Message();
+										if(!quotedMessage.populateFromResult(iphone, result2, 0)){
+											System.out.println("failed loading quoted message");
+											return false;
+										}
+									}
+								}
+								if(thirdLayer != null && mentions){
+									while(thirdLayerFinder.hasNext()){
+										thirdLayer = thirdLayerFinder.next();
+										if(thirdLayer.getName().equals("string")){
+											if(mentionedJid == null){
+												mentionedJid = thirdLayer.getContent();
+											}else{
+												mentionedJid = mentionedJid + "," + thirdLayer.getContent();
+											}
+										}
+									}
+								}
+								
+							}
 						}
 					}
 				}
-				// media is an audio
-				else if(vcardString != null && vcardString.indexOf("audio") == 0){
-					mediaWaType = 2;
-				}
-				// media is a video
-				else if(vcardString != null && vcardString.indexOf("video") == 0){
-					mediaWaType = 3;
-				}
-				// media is an image
-				else if(vcardString != null && vcardString.indexOf("image") == 0){
-					mediaWaType = 1;
-				}
+				
+				
+				// 5. if UID after mentions is not 0
+				// 5.1 leave the dict element
+				// 5.2 ignore 1 string element
+				// 5.3 ignore 1 dict element
+				// 5.4 collect all incoming string elements
+				// 5.5 set mentioned_jids accordingly
+				// 6. if UID after quotedMessageData is not 0
+				// 6.1 leave the dict element
+				// 6.2 capture first string as the key_id of the message to be clone
+				// 6.3 clone the message to messages_quotes
+				// 6.4 obtain _id of the cloned message
+				// 6.5 set quoted_row_id to _id of the cloned message
 			}
-			//}
+			MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, quotedRowId, mentionedJids, quotedMessage);
+		}catch(Exception ex){
+			System.out.println("failed populating from result set");
+			System.out.println(ex.getMessage());
+			ex.printStackTrace();
+			return false;
 		}
-		// parse bplist
-		int quotedRowId = 0;
-		String mentionedJids = null;
-		byte[] bplist = result.getBytes("ZWAMEDIAITEM.ZMETADATA");
-		if(bplist != null){
-			XMLElement 
-			// 1. traverse to the first dict element
-			// 2. traverse to the first array element
-			// 3. traverse to the first dict element
-			// 4. traverse through the key elements, check UID element after mentions and quotedMessageData
-			// 5. if UID after mentions is not 0
-			// 5.1 leave the dict element
-			// 5.2 ignore 1 string element
-			// 5.3 ignore 1 dict element
-			// 5.4 collect all incoming string elements
-			// 5.5 set mentioned_jids accordingly
-			// 6. if UID after quotedMessageData is not 0
-			// 6.1 leave the dict element
-			// 6.2 capture first string as the key_id of the message to be clone
-			// 6.3 clone the message to messages_quotes
-			// 6.4 obtain _id of the cloned message
-			// 6.5 set quoted_row_id to _id of the cloned message
-		}
-		MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, quotedRowId, mentionedJids);
+		return true;
 	}
-	public boolean injectAndroid(Connection android, boolean quoted){
+	public int injectAndroid(Connection iphone, boolean quoted){
 		try{
+			if(quote != null && !quoted){
+				
+			}
 			boolean link = false;
 			if(media_wa_type == -1){
 				link = true;
@@ -337,9 +472,9 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			System.out.println("failed to inject message " + id + "\nquoted: " + quoted);
 			System.out.println(ex.getMessage());
 			ex.printStackTrace();
-			return false;
+			return -1;
 		}
-		return true;
+		return id;
 	}
 	// helper functions
 	public static long nsDateToMilliSecondTimeStamp(float in){
