@@ -53,7 +53,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		"LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK "
 		+
 		"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE ";
-	public static final String standardSqlAfterWhere = "GROUP BY ZWAMESSAGE.Z_PK ";
+	public static final String standardSqlAfterWhere = "GROUP BY ZWAMESSAGE.Z_PK ORDER BY ZWAMESSAGE.ZMESSAGEDATE";
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
 	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote){
 		status = key_from_me == 1 ? 13 : 0;
@@ -80,7 +80,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	public MessageItem(){
 		return;
 	}
-	public boolean populateFromResult(Connection iphone, ResultSet result, long id, boolean checkQuoted, byte[] thumbImage){
+	public boolean populateFromResult(Connection iphone, ResultSet result, long id, boolean checkQuoted, byte[] thumbImage, Connection android){
 		try{
 			String remoteResource = null;
 			if(result.getInt(18/*("ZWAGROUPMEMBER.Z_PK"*//*"ZGROUPMEMBER"*/) != 0){
@@ -250,7 +250,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 										}
 										if(thirdLayer != null && quotedMessageData){
 											String quotedMessageKeyId = thirdLayer.getContent();
-											PreparedStatement sql = iphone.prepareStatement(
+											/*PreparedStatement sql = iphone.prepareStatement(
 											standardSql
 											+
 											"WHERE ZWAMESSAGE.ZSTANZAID = ?"
@@ -264,10 +264,14 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 													System.out.println("failed loading quoted message");
 													return false;
 												}
+											}*/
+											// need to clone media it seems
+											quotedMessage = new MessageItem();
+											if(!quotedMessage.cloneFromAndroid(android, quotedMessageKeyId)){
+												quotedMessage = null;
 											}
 										}
-										// temporarily disabled
-										if(thirdLayer != null && mentions && false){
+										if(thirdLayer != null && mentions){
 											while(thirdLayerFinder.hasNext()){
 												thirdLayer = thirdLayerFinder.next();
 												if(thirdLayer.getName().equals("string")){
@@ -408,6 +412,28 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			return -1;
 		}
 		return id;
+	}
+	public boolean cloneFromAndroid(Connection android, String keyId){
+		try{
+			PreparedStatement sql = android.prepareStatement("SELECT key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, longitude, latitude, key_id, mentioned_jids, quoted_row_id FROM messages WHERE key_id = ?");
+			sql.setString(1, keyId);
+			ResultSet result = sql.executeQuery();
+			if(result.next()){
+				init(0, result.getString("key_remote_jid"), result.getInt("key_from_me"), result.getLong("timestamp"), result.getString("media_caption"), result.getString("media_mime_type"), result.getString("media_name"), result.getString("data"), result.getInt("media_wa_type"), result.getInt("media_duration"), result.getString("remote_resource"), result.getBytes("thumb_image"), result.getFloat("longitude"), result.getFloat("latitude"), result.getString("key_id"), result.getString("mentioned_jids"), null);
+				quoted_row_id = result.getLong("quoted_row_id");
+			}else{
+				//message probably deleted
+				//System.out.println("clone from android failed");
+				//System.out.println("\ncan't find message, from future perhaps? key_id: " + keyId);
+				return false;
+			}
+		}catch(Exception ex){
+			System.out.println("clone from android failed");
+			System.out.println(ex.getMessage());
+			ex.printStackTrace();
+			return false;
+		}
+		return true;
 	}
 	// helper functions
 	public static long nsDateToMilliSecondTimeStamp(float in){

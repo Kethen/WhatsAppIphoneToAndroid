@@ -213,6 +213,8 @@ public class Migrator{
 			int fileCount = 0;
 			long current = 0;
 			System.out.println("begin message migration");
+			byte[] thumbImage = null;
+			byte[] rawData = null;
 			while(result.next()){
 				int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*//*"ZMESSAGETYPE"*/);
 				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
@@ -220,73 +222,77 @@ public class Migrator{
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
 					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
 					// copy the file
-					String localMediaPath = result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/);
-					String fileExtension = null;
-					if(localMediaPath != null){
-						String[] splitted = localMediaPath.split("\\.");
-						if(splitted.length == 0){
-							System.out.println("sum ting wong with ZMEDIALOCALPATH");
-							System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
-							return false;
+					if(mediaWaType == 8 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3){
+						String localMediaPath = result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/);
+						String fileExtension = null;
+						if(localMediaPath != null){
+							String[] splitted = localMediaPath.split("\\.");
+							if(splitted.length == 0){
+								System.out.println("sum ting wong with ZMEDIALOCALPATH");
+								System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
+								return false;
+							}
+							fileExtension = splitted[splitted.length - 1];
+							FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
+							FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
+							BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
+							BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+							byte[] copyBuffer = new byte[1024];
+							int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+							while(readSize != -1){
+								bufferedOutFile.write(copyBuffer, 0, readSize);
+								readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+							}
+							bufferedInFile.close();
+							bufferedOutFile.close();
 						}
-						fileExtension = splitted[splitted.length - 1];
-						FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
-						FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
-						BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
-						BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
-						byte[] copyBuffer = new byte[1024];
-						int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-						while(readSize != -1){
-							bufferedOutFile.write(copyBuffer, 0, readSize);
-							readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+						// prepare a thumbnail for raw data
+						
+						// craft a com.whatsapp.MediaData object
+						
+						MediaData crafted = new MediaData();
+						crafted.transferred = true;
+						if(localMediaPath != null){
+							crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+						}else{
+							crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
 						}
-						bufferedInFile.close();
-						bufferedOutFile.close();
+						crafted.fileSize = result.getInt(14/*"ZWAMEDIAITEM.ZFILESIZE"*/)/*result2.getInt("ZFILESIZE")*/;
+						crafted.suspiciousContent = 0;
+						if(mediaWaType == 3){
+							crafted.faceX = 0;
+							crafted.faceY = 0;
+						}else{
+							crafted.faceX = -1;
+							crafted.faceY = -1;
+						}
+						crafted.mediaKey = new byte[3];
+						Arrays.fill(crafted.mediaKey, (byte) 'A');
+						crafted.refKey = new byte[3];
+						Arrays.fill(crafted.refKey, (byte) 'A');
+						crafted.cipherKey = new byte[3];
+						Arrays.fill(crafted.cipherKey, (byte) 'A');
+						crafted.hmacKey = new byte[3];
+						Arrays.fill(crafted.hmacKey, (byte) 'A');
+						crafted.iv = new byte[3];
+						Arrays.fill(crafted.iv, (byte) 'A');
+						crafted.failErrorCode = 0;
+						crafted.width = result.getInt(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getInt("ZLONGITUDE")*/;
+						crafted.height = result.getInt(17/*"ZWAMEDIAITEM.ZLATITUDE"*/) /*result2.getInt("ZLATITUDE")*/;
+						crafted.doodleId = "Does it really matter?";
+						crafted.gifAttribution = 0;
+						crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
+						crafted.uploadRetry = false;
+						fileCount++;
+						// serialize the object
+						ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
+						ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
+						objectOutput.writeObject(crafted);
+						objectOutput.close();
+						thumbImage = craftedBuffer.toByteArray();
 					}
-					// craft a com.whatsapp.MediaData object
-					byte[] thumbImage = null;
-					MediaData crafted = new MediaData();
-					crafted.transferred = true;
-					if(localMediaPath != null){
-						crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
-					}else{
-						crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
-					}
-					crafted.fileSize = result.getInt(14/*"ZWAMEDIAITEM.ZFILESIZE"*/)/*result2.getInt("ZFILESIZE")*/;
-					crafted.suspiciousContent = 0;
-					if(mediaWaType == 3){
-						crafted.faceX = 0;
-						crafted.faceY = 0;
-					}else{
-						crafted.faceX = -1;
-						crafted.faceY = -1;
-					}
-					crafted.mediaKey = new byte[3];
-					Arrays.fill(crafted.mediaKey, (byte) 'A');
-					crafted.refKey = new byte[3];
-					Arrays.fill(crafted.refKey, (byte) 'A');
-					crafted.cipherKey = new byte[3];
-					Arrays.fill(crafted.cipherKey, (byte) 'A');
-					crafted.hmacKey = new byte[3];
-					Arrays.fill(crafted.hmacKey, (byte) 'A');
-					crafted.iv = new byte[3];
-					Arrays.fill(crafted.iv, (byte) 'A');
-					crafted.failErrorCode = 0;
-					crafted.width = result.getInt(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getInt("ZLONGITUDE")*/;
-					crafted.height = result.getInt(17/*"ZWAMEDIAITEM.ZLATITUDE"*/) /*result2.getInt("ZLATITUDE")*/;
-					crafted.doodleId = "Does it really matter?";
-					crafted.gifAttribution = 0;
-					crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
-					crafted.uploadRetry = false;
-					fileCount++;
-					// serialize the object
-					ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
-					ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
-					objectOutput.writeObject(crafted);
-					objectOutput.close();
-					thumbImage = craftedBuffer.toByteArray();
 					MessageItem message = new MessageItem();
-					if(!message.populateFromResult(iphone, result, 0, true, thumbImage)){
+					if(!message.populateFromResult(iphone, result, 0, true, thumbImage, android)){
 						System.out.println("loading message failed");
 						return false;
 					}
