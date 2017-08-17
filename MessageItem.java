@@ -75,6 +75,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.latitude = latitude;
 		this.key_id = key_id;
 		this.mentioned_jids = mentioned_jids;
+		this.quote = quote;
 	}
 	public MessageItem(){
 		return;
@@ -171,12 +172,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			if(checkQuoted){
 				byte[] bplist = result.getBytes(23/*"ZWAMEDIAITEM.ZMETADATA"*/);
 				if(bplist != null){
-					//FileSystem tempfs = Jimfs.newFileSystem(Configuration.unix());
-					//Path xmlFilePath = tempfs.getPath("/bpl");
-					//File xmlFile = xmlFilePath.toFile();
-					//FileOutputStream xmlWrite = new FileOutputStream(xmlFile);
-					//xmlWrite.write(bplist, 0, bplist.length);
-					//xmlWrite.close();
+					//System.out.println("bplist != null");
 					ConvertToXml converter = new ConvertToXml();
 					XMLElement xml = null;
 					try{
@@ -185,6 +181,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 						System.out.println("bad bplist from ZMETADATA x.x");
 						return false;
 					}
+
 					if(xml != null){
 						// 1. traverse to the first dict element
 						Iterator<XMLElement> firstLayerFinder = xml.iterateChildren();
@@ -281,7 +278,15 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 												}
 											}
 										}
-										
+									}
+									if(mentions){
+										PrintWriter pw = new PrintWriter(System.out);
+										ConvertToXml.dig(pw, xml, 0);
+										pw.flush();
+										System.out.println("mentionedJid: " + mentionedJids);
+										System.out.println("paused...");
+										Scanner scanner = new Scanner(System.in);
+										scanner.nextLine();
 									}
 								}
 							}

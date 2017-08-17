@@ -265,7 +265,7 @@ public class ConvertToXml {
         }
         return;
     }
-    private static void dig(PrintWriter out, XMLElement xml, int indent){
+    public static void dig(PrintWriter out, XMLElement xml, int indent){
 	if(xml == null){
 		System.out.println("Something's wrong with the pblist input");
 		return;
