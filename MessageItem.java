@@ -258,7 +258,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 											standardSqlAfterWhere);
 											sql.setString(1, quotedMessageKeyId);
 											ResultSet result2 = sql.executeQuery();
-											if(result.next()){
+											if(result2.next()){
 												quotedMessage = new MessageItem();
 												if(!quotedMessage.populateFromResult(iphone, result2, 0, false, null)){
 													System.out.println("failed loading quoted message");
@@ -278,15 +278,6 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 												}
 											}
 										}
-									}
-									if(mentions){
-										PrintWriter pw = new PrintWriter(System.out);
-										ConvertToXml.dig(pw, xml, 0);
-										pw.flush();
-										System.out.println("mentionedJid: " + mentionedJids);
-										System.out.println("paused...");
-										Scanner scanner = new Scanner(System.in);
-										scanner.nextLine();
 									}
 								}
 							}
