@@ -10,13 +10,9 @@ import com.whatsapp.MediaData;
 import java.io.*;
 import nl.pvanassen.bplist.converter.ConvertToXml;
 import nl.pvanassen.bplist.ext.nanoxml.XMLElement;
-import com.google.common.jimfs.Configuration;
-import com.google.common.jimfs.Jimfs;
-import java.nio.file.FileSystem;
-import java.nio.file.Path;
 import java.util.*;
 public class MessageItem{ // messages <- ZWAMESSAGE
-	int id; // _id <- Z_PK
+	long id; // _id <- Z_PK
 	String key_id;
 	String key_remote_jid; // ZTOJID, if null ZFROMJID
 	int key_from_me; // ZISFROMME
@@ -37,11 +33,29 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	byte[] thumb_image; // serialized java data, com.whatsapp.MediaDat
 	float longitude;
 	float latitude;
-	int quoted_row_id;
+	long quoted_row_id;
 	String mentioned_jids;
 	MessageItem quote;
+	public static final String standardSql = "SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID, "
+		+
+		/*9*/"ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE, "
+		+
+		/*18*/"ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID, "
+		+
+		/*20*/"ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY, "
+		+
+		/*23*/"ZWAMEDIAITEM.ZMETADATA "
+		+
+		"FROM ZWAMESSAGE "
+		+
+		"LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK "
+		+
+		"LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK "
+		+
+		"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE ";
+	public static final String standardSqlAfterWhere = "GROUP BY ZWAMESSAGE.Z_PK ";
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public void init(int id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote){
+	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		quoted_row_id = 0;
@@ -65,21 +79,21 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	public MessageItem(){
 		return;
 	}
-	public boolean populateFromResult(Connection iphone, ResultSet result, int id, boolean checkQuoted, byte[] thumbImage){
+	public boolean populateFromResult(Connection iphone, ResultSet result, long id, boolean checkQuoted, byte[] thumbImage){
 		try{
 			String remoteResource = null;
-			if(result.getInt("ZWAGROUPMEMBER.Z_PK"/*"ZGROUPMEMBER"*/) != 0){
-				remoteResource = result.getString("ZWAGROUPMEMBER.ZMEMBERJID");
+			if(result.getInt(18/*("ZWAGROUPMEMBER.Z_PK"*//*"ZGROUPMEMBER"*/) != 0){
+				remoteResource = result.getString(19/*"ZWAGROUPMEMBER.ZMEMBERJID"*/);
 			}
-			long msgDate = nsDateToMilliSecondTimeStamp(result.getFloat("ZWAMESSAGE.ZMESSAGEDATE"/*"ZMESSAGEDATE"*/));
-			int fromMe = result.getInt("ZWAMESSAGE.ZISFROMME"/*"ZISFROMME"*/);
+			long msgDate = nsDateToMilliSecondTimeStamp(result.getFloat(4/*"ZWAMESSAGE.ZMESSAGEDATE"*//*"ZMESSAGEDATE"*/));
+			int fromMe = result.getInt(3/*"ZWAMESSAGE.ZISFROMME"*//*"ZISFROMME"*/);
 			String jid;
 			if(fromMe == 1){
-				jid = result.getString("ZWAMESSAGE.ZTOJID"/*"ZTOJID"*/);
+				jid = result.getString(1/*"ZWAMESSAGE.ZTOJID"*//*"ZTOJID"*/);
 			}else{
-				jid = result.getString("ZWAMESSAGE.ZFROMJID"/*"ZFROMJID"*/);
+				jid = result.getString(2/*"ZWAMESSAGE.ZFROMJID"*//*"ZFROMJID"*/);
 			}
-			String keyId = result.getString("ZWAMESSAGE.ZSTANZAID"/*"ZSTANZAID"*/);
+			String keyId = result.getString(8/*"ZWAMESSAGE.ZSTANZAID"*//*"ZSTANZAID"*/);
 			String data = null;
 			String mediaCaption = null;
 			String mediaName = null;
@@ -87,44 +101,44 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			String mediaMimeType = null;
 			float longitude = 0;
 			float latitude = 0;
-			int mediaWaType = result.getInt("ZWAMESSAGE.ZMESSAGETYPE");
+			int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*/);
 			// the sent message is a link
-			if(result.getInt("ZWAMESSAGEDATAITEM.Z_PK") != 0){
-				data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-				mediaCaption = result.getString("ZWAMESSAGEDATAITEM.ZTITLE") /*result2.getString("ZTITLE")*/;
-				mediaName = result.getString("ZWAMESSAGEDATAITEM.ZSUMMARY") /*result2.getString("ZSUMMARY")*/;
+			if(result.getInt(20/*"ZWAMESSAGEDATAITEM.Z_PK"*/) != 0){
+				data = result.getString(5/*"ZWAMESSAGE.ZTEXT"*//*"ZTEXT"*/);
+				mediaCaption = result.getString(21/*"ZWAMESSAGEDATAITEM.ZTITLE"*/) /*result2.getString("ZTITLE")*/;
+				mediaName = result.getString(22/*"ZWAMESSAGEDATAITEM.ZSUMMARY"*/) /*result2.getString("ZSUMMARY")*/;
 				mediaWaType = -1; // actually for injecting
 			}
 			// the sent message is just a text message
 			else if(mediaWaType == 0){
-				data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+				data = result.getString(5/*"ZWAMESSAGE.ZTEXT"*//*"ZTEXT"*/);
 			}
 			// the sent message is a media
-			else if(result.getInt("ZWAMEDIAITEM.Z_PK"/*"ZMEDIAITEM"*/) != 0){
-				String vcardString = result.getString("ZWAMEDIAITEM.ZVCARDSTRING") /*result2.getString("ZVCARDSTRING")*/;
+			else if(result.getInt(9/*"ZWAMEDIAITEM.Z_PK"*//*"ZMEDIAITEM"*/) != 0){
+				String vcardString = result.getString(11/*"ZWAMEDIAITEM.ZVCARDSTRING"*/) /*result2.getString("ZVCARDSTRING")*/;
 				// the media is a vcard
 				if(mediaWaType == 4){
 					data = vcardString;
-					mediaName = result.getString("ZWAMEDIAITEM.ZVCARDNAME") /*result2.getString("ZVCARDNAME")*/;
+					mediaName = result.getString(12/*"ZWAMEDIAITEM.ZVCARDNAME"*/) /*result2.getString("ZVCARDNAME")*/;
 				}
 				// the media is a location
 				else if(mediaWaType == 5){
 					// stub ish, not enough iphone location sample
-					data = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
-					longitude = result.getFloat("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getFloat("ZLONGITUDE")*/;
-					latitude = result.getFloat("ZWAMEDIAITEM.ZLATITUDE")/*result2.getFloat("ZLATITUDE")*/;
+					data = result.getString(5/*"ZWAMESSAGE.ZTEXT"*//*"ZTEXT"*/);
+					longitude = result.getFloat(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getFloat("ZLONGITUDE")*/;
+					latitude = result.getFloat(17/*"ZWAMEDIAITEM.ZLATITUDE"*/)/*result2.getFloat("ZLATITUDE")*/;
 				}
 				// the media is a media
 				else{
 					// common components
 					mediaMimeType = vcardString;
-					mediaCaption = result.getString("ZWAMEDIAITEM.ZTITLE")/*result2.getString("ZTITLE")*/;
-					mediaDuration = result.getInt("ZWAMEDIAITEM.ZMOVIEDURATION")/*result2.getInt("ZMOVIEDURATION")*/;
+					mediaCaption = result.getString(10/*"ZWAMEDIAITEM.ZTITLE"*/)/*result2.getString("ZTITLE")*/;
+					mediaDuration = result.getInt(13/*"ZWAMEDIAITEM.ZMOVIEDURATION"*/)/*result2.getInt("ZMOVIEDURATION")*/;
 					// file copying and thumimage generation in parent due to number of file tracking
 					// media is a document
 					if(mediaWaType == 8){
 						mediaWaType = 9;
-						String fileName = result.getString("ZWAMESSAGE.ZTEXT"/*"ZTEXT"*/);
+						String fileName = result.getString(5/*"ZWAMESSAGE.ZTEXT"*//*"ZTEXT"*/);
 						mediaName = fileName;
 						if(fileName != null){
 							String[] splitted;
@@ -155,141 +169,138 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			String mentionedJids = null;
 			MessageItem quotedMessage = null;
 			if(checkQuoted){
-				byte[] bplist = result.getBytes("ZWAMEDIAITEM.ZMETADATA");
+				byte[] bplist = result.getBytes(23/*"ZWAMEDIAITEM.ZMETADATA"*/);
 				if(bplist != null){
-					FileSystem tempfs = Jimfs.newFileSystem(Configuration.unix());
-					Path xmlFilePath = tempfs.getPath("/bpl");
-					File xmlFile = xmlFilePath.toFile();
-					FileOutputStream xmlWrite = new FileOutputStream(xmlFile);
-					xmlWrite.write(bplist, 0, bplist.length);
-					xmlWrite.close();
+					//FileSystem tempfs = Jimfs.newFileSystem(Configuration.unix());
+					//Path xmlFilePath = tempfs.getPath("/bpl");
+					//File xmlFile = xmlFilePath.toFile();
+					//FileOutputStream xmlWrite = new FileOutputStream(xmlFile);
+					//xmlWrite.write(bplist, 0, bplist.length);
+					//xmlWrite.close();
 					ConvertToXml converter = new ConvertToXml();
-					XMLElement xml = converter.convertToXml(xmlFile);
-					// 1. traverse to the first dict element
-					Iterator<XMLElement> firstLayerFinder = xml.iterateChildren();
-					XMLElement firstLayer = null;
-					while(firstLayerFinder.hasNext()){
-						XMLElement temp = firstLayerFinder.next();
-						if(temp.getName().equals("dict")){
-							firstLayer = temp;
-							break;
-						}
+					XMLElement xml = null;
+					try{
+						xml = converter.convertToXml(new ByteArrayInputStream(bplist));
+					}catch(Exception ex){
+						System.out.println("bad bplist from ZMETADATA x.x");
+						return false;
 					}
-					// 2. traverse to the first array element
-					if(firstLayer != null){
-						XMLElement secondLayer = null;
-						Iterator<XMLElement> secondLayerFinder = firstLayer.iterateChildren();
-						while(secondLayerFinder.hasNext()){
-							XMLElement temp = secondLayerFinder.next();
-							if(temp.getName().equals("array")){
-								secondLayer = temp;
+					if(xml != null){
+						// 1. traverse to the first dict element
+						Iterator<XMLElement> firstLayerFinder = xml.iterateChildren();
+						XMLElement firstLayer = null;
+						while(firstLayerFinder.hasNext()){
+							XMLElement temp = firstLayerFinder.next();
+							if(temp.getName().equals("dict")){
+								firstLayer = temp;
 								break;
 							}
 						}
-					// 3. traverse to the first dict element
-						if(secondLayer != null){
-							XMLElement thirdLayer = null;
-							Iterator<XMLElement> thirdLayerFinder = secondLayer.iterateChildren();
-							while(thirdLayerFinder.hasNext()){
-								XMLElement temp = thirdLayerFinder.next();
-								if(temp.getName().equals("dict")){
-									thirdLayer = temp;
+						// 2. traverse to the first array element
+						if(firstLayer != null){
+							XMLElement secondLayer = null;
+							Iterator<XMLElement> secondLayerFinder = firstLayer.iterateChildren();
+							while(secondLayerFinder.hasNext()){
+								XMLElement temp = secondLayerFinder.next();
+								if(temp.getName().equals("array")){
+									secondLayer = temp;
 									break;
 								}
 							}
-					// 4. traverse through the key elements, check UID element after mentions and quotedMessageData
-							if(thirdLayer != null){
-								Iterator<XMLElement> keyFinder = thirdLayer.iterateChildren();
-								boolean mentions = false;
-								boolean quotedMessageData = false;
-								while(keyFinder.hasNext()){
-									XMLElement temp = keyFinder.next();
-									if(temp.getName().equals("key") && temp.getContent().equals("mentions")){
-										if(keyFinder.hasNext()){
-											temp = keyFinder.next();
-											if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
-												mentions = true;
-											}
-										}
-									}else if(temp.getName().equals("key") && temp.getContent().equals("quotedMessageData")){
-										if(keyFinder.hasNext()){
-											temp = keyFinder.next();
-											if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
-												quotedMessageData = true;
-											}
-										}
+						// 3. traverse to the first dict element
+							if(secondLayer != null){
+								XMLElement thirdLayer = null;
+								Iterator<XMLElement> thirdLayerFinder = secondLayer.iterateChildren();
+								while(thirdLayerFinder.hasNext()){
+									XMLElement temp = thirdLayerFinder.next();
+									if(temp.getName().equals("dict")){
+										thirdLayer = temp;
+										break;
 									}
 								}
-					// 5. leave the dict element, to the first string element after
-								if(mentions || quotedMessageData){
-									thirdLayer = null;
-									while(thirdLayerFinder.hasNext()){
-										XMLElement temp = thirdLayerFinder.next();
-										if(temp.getName().equals("string")){
-											thirdLayer = temp;
-											break;
-										}
-									}
-									if(thirdLayer != null && quotedMessageData){
-										String quotedMessageKeyId = thirdLayer.getContent();
-										PreparedStatement sql = iphone.prepareStatement("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,"
-										+
-										"ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,"
-										+
-										"ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,"
-										+
-										"ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY"
-										+
-										"FROM ZWAMESSAGE"
-										+
-										"LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK"
-										+
-										"LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK"
-										+
-										"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE"
-										+
-										"WHERE ZWAMESSAGE.ZSTANZAID = ?");
-										sql.setString(1, quotedMessageKeyId);
-										ResultSet result2 = sql.executeQuery();
-										if(result.next()){
-											quotedMessage = new MessageItem();
-											if(!quotedMessage.populateFromResult(iphone, result2, 0, false, null)){
-												System.out.println("failed loading quoted message");
-												return false;
+						// 4. traverse through the key elements, check UID element after mentions and quotedMessageData
+								if(thirdLayer != null){
+									Iterator<XMLElement> keyFinder = thirdLayer.iterateChildren();
+									boolean mentions = false;
+									boolean quotedMessageData = false;
+									while(keyFinder.hasNext()){
+										XMLElement temp = keyFinder.next();
+										if(temp.getName().equals("key") && temp.getContent().equals("mentions")){
+											if(keyFinder.hasNext()){
+												temp = keyFinder.next();
+												if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
+													mentions = true;
+												}
 											}
-										}
-									}
-									if(thirdLayer != null && mentions){
-										while(thirdLayerFinder.hasNext()){
-											thirdLayer = thirdLayerFinder.next();
-											if(thirdLayer.getName().equals("string")){
-												if(mentionedJids == null){
-													mentionedJids = thirdLayer.getContent();
-												}else{
-													mentionedJids = mentionedJids + "," + thirdLayer.getContent();
+										}else if(temp.getName().equals("key") && temp.getContent().equals("quotedMessageData")){
+											if(keyFinder.hasNext()){
+												temp = keyFinder.next();
+												if(temp.getName().equals("UID") && !temp.getContent().equals("0")){
+													quotedMessageData = true;
 												}
 											}
 										}
 									}
-									
+						// 5. leave the dict element, to the first string element after
+									if(mentions || quotedMessageData){
+										thirdLayer = null;
+										while(thirdLayerFinder.hasNext()){
+											XMLElement temp = thirdLayerFinder.next();
+											if(temp.getName().equals("string")){
+												thirdLayer = temp;
+												break;
+											}
+										}
+										if(thirdLayer != null && quotedMessageData){
+											String quotedMessageKeyId = thirdLayer.getContent();
+											PreparedStatement sql = iphone.prepareStatement(
+											standardSql
+											+
+											"WHERE ZWAMESSAGE.ZSTANZAID = ?"
+											+
+											standardSqlAfterWhere);
+											sql.setString(1, quotedMessageKeyId);
+											ResultSet result2 = sql.executeQuery();
+											if(result.next()){
+												quotedMessage = new MessageItem();
+												if(!quotedMessage.populateFromResult(iphone, result2, 0, false, null)){
+													System.out.println("failed loading quoted message");
+													return false;
+												}
+											}
+										}
+										if(thirdLayer != null && mentions){
+											while(thirdLayerFinder.hasNext()){
+												thirdLayer = thirdLayerFinder.next();
+												if(thirdLayer.getName().equals("string")){
+													if(mentionedJids == null){
+														mentionedJids = thirdLayer.getContent();
+													}else{
+														mentionedJids = mentionedJids + "," + thirdLayer.getContent();
+													}
+												}
+											}
+										}
+										
+									}
 								}
 							}
 						}
+						
+						
+						// 5. if UID after mentions is not 0
+						// 5.1 leave the dict element
+						// 5.2 ignore 1 string element
+						// 5.3 ignore 1 dict element
+						// 5.4 collect all incoming string elements
+						// 5.5 set mentioned_jids accordingly
+						// 6. if UID after quotedMessageData is not 0
+						// 6.1 leave the dict element
+						// 6.2 capture first string as the key_id of the message to be clone
+						// 6.3 clone the message to messages_quotes
+						// 6.4 obtain _id of the cloned message
+						// 6.5 set quoted_row_id to _id of the cloned message
 					}
-					
-					
-					// 5. if UID after mentions is not 0
-					// 5.1 leave the dict element
-					// 5.2 ignore 1 string element
-					// 5.3 ignore 1 dict element
-					// 5.4 collect all incoming string elements
-					// 5.5 set mentioned_jids accordingly
-					// 6. if UID after quotedMessageData is not 0
-					// 6.1 leave the dict element
-					// 6.2 capture first string as the key_id of the message to be clone
-					// 6.3 clone the message to messages_quotes
-					// 6.4 obtain _id of the cloned message
-					// 6.5 set quoted_row_id to _id of the cloned message
 				}
 			}
 			init(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, mentionedJids, quotedMessage);
@@ -301,7 +312,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		}
 		return true;
 	}
-	public int injectAndroid(Connection android, boolean quoted){
+	public long injectAndroid(Connection android, boolean quoted){
 		try{
 			String table;
 			if(quoted){
@@ -313,7 +324,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				Statement sql = android.createStatement();
 				ResultSet result = sql.executeQuery("SELECT MAX(_id) FROM " + table);
 				if(result.next()){
-					id = result.getInt("MAX(_id)") + 1;
+					id = result.getLong("MAX(_id)") + 1;
 				}else{
 					id = 2;
 				}
@@ -333,7 +344,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			String insertStatement = "INSERT INTO " + table + "(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude, quoted_row_id, mentioned_jids) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			PreparedStatement sql = android.prepareStatement(insertStatement);
-			sql.setInt(1, id);
+			sql.setLong(1, id);
 			sql.setString(2, key_remote_jid);
 			sql.setInt(3, key_from_me);
 			sql.setLong(4, timestamp);
@@ -375,7 +386,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			sql.setFloat(16, longitude);
 			sql.setFloat(17, latitude);
 			if(quoted_row_id != 0){
-				sql.setInt(18, quoted_row_id);
+				sql.setLong(18, quoted_row_id);
 			}else{
 				sql.setNull(18, Types.INTEGER);
 			}
@@ -389,12 +400,12 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			if(link){
 				sql = android.prepareStatement("INSERT INTO messages_links(key_remote_jid, message_row_id) VALUES(?, ?)");
 				sql.setString(1, remote_resource == null ? key_remote_jid : remote_resource);
-				sql.setInt(2, id);
+				sql.setLong(2, id);
 				sql.execute();
 				sql.close();
 			}
 		}catch(Exception ex){
-			System.out.println("failed to inject message " + id + "\nquoted: " + quoted);
+			System.out.println("failed to inject message " + id + "\nquoted: " + quoted + "\nkey_id: " + key_id);
 			System.out.println(ex.getMessage());
 			ex.printStackTrace();
 			return -1;

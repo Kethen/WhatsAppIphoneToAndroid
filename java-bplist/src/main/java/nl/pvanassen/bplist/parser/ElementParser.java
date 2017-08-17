@@ -81,6 +81,69 @@ public class ElementParser {
     }
 
     /**
+     * Parse object table with an input stream. This method will not close
+     * the input stream for you.
+     *
+     * @param is
+     *            Input stream
+     * @return List of objects parsed
+     * @throws IOException
+     *             In case of an error
+     */
+    public List<BPListElement<?>> parseObjectTable(InputStream is) throws IOException{
+        // mimic using a raf but with a InputStream so that we can read from memory if wanted
+        // supports only input streams that allows reset()
+        //byte[] intBuffer = new byte[4];
+        //byte[] longBuffer = new byte[8];
+        //was going to extend RandomAccessFile but realise I can't initialize it without a real file
+        //assume that everything happens here were in memory or some other InputStream that has no File
+        byte[] readBuffer = new byte[1024];
+        int length = 0;
+        int readSize;
+        is.reset();
+        while((readSize = is.read(readBuffer, 0, 1024)) != -1){
+            length += readSize;
+        }
+        // read bpli and st00 from header
+        is.reset();
+        readSize = is.read(readBuffer, 0, 8);
+        if(readSize != 8){
+            throw new IOException("parseHeader: File too small to be a bplist.");
+        }
+        int bpli = ((readBuffer[0] & 0xFF) << 24) | ((readBuffer[1] & 0xFF) << 16) | ((readBuffer[2] & 0xFF) << 8) | (readBuffer[3] & 0xFF);
+        int st00 = ((readBuffer[4] & 0xFF) << 24) | ((readBuffer[5] & 0xFF) << 16) | ((readBuffer[6] & 0xFF) << 8) | (readBuffer[7] & 0xFF);
+        if ((bpli != 0x62706c69) || (st00 != 0x73743030)) {
+            throw new IOException("parseHeader: File does not start with 'bplist00' magic.");
+        }
+        // read refCount and topLevelOffset from trailer
+        is.reset();
+        is.skip(length - 32);
+        readSize = is.read(readBuffer, 0, 16);
+        if(readSize != 16){
+            throw new IOException("parseHeader: File too small to be a bplist.");
+        }
+        int refCount = ((readBuffer[12] & 0xFF) << 24) | ((readBuffer[13] & 0xFF) << 16) | ((readBuffer[14] & 0xFF) << 8) | (readBuffer[15] & 0xFF);
+        readSize = is.read(readBuffer, 0, 16);
+        if(readSize != 16){
+            throw new IOException("parseHeader: File too small to be a bplist.");
+        }
+        int topLevelOffset = ((readBuffer[12] & 0xFF) << 24) | ((readBuffer[13] & 0xFF) << 16) | ((readBuffer[14] & 0xFF) << 8) | (readBuffer[15] & 0xFF);
+        
+        is.reset();
+        is.skip(8);
+        // read all to memory
+        byte[] buf = new byte[topLevelOffset - 8];
+        readSize = is.read(buf, 0, topLevelOffset - 8);
+        if(readSize != (topLevelOffset - 8)){
+            throw new IOException("parseHeader: File too small to be a bplist.");
+        }
+        ByteArrayInputStream stream = new ByteArrayInputStream(buf);
+        
+        return parseObjectTable(new DataInputStream(stream), refCount);
+
+    }
+
+    /**
      * Object Formats (marker byte followed by additional info in some cases)
      * <ul>
      * <li>null 0000 0000</li>

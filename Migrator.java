@@ -164,12 +164,12 @@ public class Migrator{
 			Statement sql = iphone.createStatement();
 			ResultSet result = sql.executeQuery("SELECT COUNT(Z_PK) AS number FROM ZWACHATSESSION");
 			result.next();
-			int numberOfSessions = result.getInt("number");
+			long numberOfSessions = result.getLong("number");
 			result.close();
 			sql.close();
 			sql = iphone.createStatement();
 			result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO, ZLASTMESSAGE FROM ZWACHATSESSION");
-			int current = 0;
+			long current = 0;
 			//String key_remote_jid, String subject, int archived, int sort_timestamp
 			System.out.println("begin chatlist migration");
 			while(result.next()){
@@ -211,41 +211,23 @@ public class Migrator{
 			Statement sql = iphone.createStatement();
 			ResultSet result = sql.executeQuery("SELECT COUNT(Z_PK) as number FROM ZWAMESSAGE");
 			result.next();
-			int numberOfMessage = result.getInt("number");
+			long numberOfMessage = result.getLong("number");
 			result.close();
 			sql.close();
 			sql = iphone.createStatement();
-			//result = sql.executeQuery("SELECT ZTOJID, ZFROMJID, ZISFROMME, ZMESSAGEDATE, ZMEDIAITEM, ZGROUPMEMBER, ZTEXT, Z_PK, ZMESSAGETYPE, ZSTANZAID FROM ZWAMESSAGE");
-			result = sql.executeQuery("SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID,"
-			+
-			"ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE,"
-			+
-			"ZWAGROUPMEMBER.Z_PK, ZWAGROUPMEMBER.ZMEMBERJID,"
-			+
-			"ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY"
-			+
-			"FROM ZWAMESSAGE"
-			+
-			"LEFT JOIN ZWAMEDIAITEM ON ZWAMESSAGE.ZMEDIAITEM = ZWAMEDIAITEM.Z_PK"
-			+
-			"LEFT JOIN ZWAGROUPMEMBER ON ZWAMESSAGE.ZGROUPMEMBER = ZWAGROUPMEMBER.Z_PK"
-			+
-			"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE");
-			//"SELECT ZTITLE, ZVCARDSTRING, ZVCARDNAME, ZMOVIEDURATION, ZFILESIZE, ZMEDIALOCALPATH, ZLONGITUDE, ZLATITUDE FROM ZWAMEDIAITEM WHERE Z_PK = ?"
-			//"SELECT ZMEMBERJID FROM ZWAGROUPMEMBER WHERE Z_PK = ?"
-			//"SELECT Z_PK, ZTITLE, ZSUMMARY FROM ZWAMESSAGEDATAITEM WHERE ZMESSAGE = ?"
+			result = sql.executeQuery(MessageItem.standardSql + MessageItem.standardSqlAfterWhere);
 			// file counter
 			int fileCount = 0;
-			int current = 2;
+			long current = 0;
 			System.out.println("begin message migration");
 			while(result.next()){
-				int mediaWaType = result.getInt("ZWAMESSAGE.ZMESSAGETYPE"/*"ZMESSAGETYPE"*/);
+				int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*//*"ZMESSAGETYPE"*/);
 				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
 					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
 					// copy the file
-					String localMediaPath = result.getString("ZWAMEDIAITEM.ZMEDIALOCALPATH");
+					String localMediaPath = result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/);
 					String fileExtension = null;
 					if(localMediaPath != null){
 						String[] splitted = localMediaPath.split("\\.");
@@ -277,7 +259,7 @@ public class Migrator{
 					}else{
 						crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
 					}
-					crafted.fileSize = result.getInt("ZWAMEDIAITEM.ZFILESIZE")/*result2.getInt("ZFILESIZE")*/;
+					crafted.fileSize = result.getInt(14/*"ZWAMEDIAITEM.ZFILESIZE"*/)/*result2.getInt("ZFILESIZE")*/;
 					crafted.suspiciousContent = 0;
 					if(mediaWaType == 3){
 						crafted.faceX = 0;
@@ -297,8 +279,8 @@ public class Migrator{
 					crafted.iv = new byte[3];
 					Arrays.fill(crafted.iv, (byte) 'A');
 					crafted.failErrorCode = 0;
-					crafted.width = result.getInt("ZWAMEDIAITEM.ZLONGITUDE")/*result2.getInt("ZLONGITUDE")*/;
-					crafted.height = result.getInt("ZWAMEDIAITEM.ZLATITUDE") /*result2.getInt("ZLATITUDE")*/;
+					crafted.width = result.getInt(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getInt("ZLONGITUDE")*/;
+					crafted.height = result.getInt(17/*"ZWAMEDIAITEM.ZLATITUDE"*/) /*result2.getInt("ZLATITUDE")*/;
 					crafted.doodleId = "Does it really matter?";
 					crafted.gifAttribution = 0;
 					crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
@@ -311,7 +293,7 @@ public class Migrator{
 					objectOutput.close();
 					thumbImage = craftedBuffer.toByteArray();
 					MessageItem message = new MessageItem();
-					if(!message.populateFromResult(iphone, result, current, true, thumbImage)){
+					if(!message.populateFromResult(iphone, result, 0, true, thumbImage)){
 						System.out.println("loading message failed");
 						return false;
 					}
@@ -322,7 +304,7 @@ public class Migrator{
 				}
 				current++;
 				System.out.print("\r");
-				System.out.print("messages added: " + (current - 2) + "/" + numberOfMessage);
+				System.out.print("messages added: " + current + "/" + numberOfMessage);
 			}
 			System.out.println("");
 			result.close();

@@ -134,6 +134,23 @@ public class ConvertToXml {
     }
     
     /**
+     * Parses a binary PList from input stream and turns it into a XMLElement. The XMLElement
+     * is equivalent with a XML PList file parsed using NanoXML.
+     * 
+     * @param is bplist input stream to parse
+     * @return Returns the parsed XMLElement.
+     * @throws IOException If the file is not found
+     */
+    public XMLElement convertToXml(InputStream is) throws IOException {
+        // Convert the object table to XML and return it
+        XMLElement root = new XMLElement(new HashMap<String, char[]>(), false, false);
+        root.setName("plist");
+        root.setAttribute("version", "1.0");
+        convertObjectTableToXML(root, parser.parseObjectTable(is).get(0));
+        return root;
+    }
+    
+    /**
      * Parses a binary PList file and turns it into a XMLElement. The XMLElement
      * is equivalent with a XML PList file parsed using NanoXML.
      * 
