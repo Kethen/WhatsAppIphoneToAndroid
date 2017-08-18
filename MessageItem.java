@@ -35,6 +35,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	float longitude;
 	float latitude;
 	long quoted_row_id;
+	String media_url;
 	String mentioned_jids;
 	MessageItem quote;
 	
@@ -46,7 +47,9 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		+
 		/*20*/"ZWAMESSAGEDATAITEM.Z_PK, ZWAMESSAGEDATAITEM.ZTITLE, ZWAMESSAGEDATAITEM.ZSUMMARY, "
 		+
-		/*23*/"ZWAMEDIAITEM.ZMETADATA, ZWAMEDIAITEM.ZXMPPTHUMBPATH "
+		/*23*/"ZWAMEDIAITEM.ZMETADATA, ZWAMEDIAITEM.ZXMPPTHUMBPATH, "
+		+
+		/*25*/"ZWAMESSAGEDATAITEM.ZCONTENT1 "
 		+
 		"FROM ZWAMESSAGE "
 		+
@@ -57,7 +60,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE ";
 	public static final String standardSqlAfterWhere = "GROUP BY ZWAMESSAGE.Z_PK ORDER BY ZWAMESSAGE.ZMESSAGEDATE";
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote, byte[] thumbnailImage){
+	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote, byte[] thumbnailImage, String media_url){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		quoted_row_id = 0;
@@ -79,6 +82,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.mentioned_jids = mentioned_jids;
 		this.quote = quote;
 		this.thumbnailImage = thumbnailImage;
+		this.media_url = media_url;
 	}
 	public MessageItem(){
 		return;
@@ -105,6 +109,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			String mediaMimeType = null;
 			float longitude = 0;
 			float latitude = 0;
+			String mediaUrl = null;
 			int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*/);
 			byte[] thumbnail = null;
 			// the sent message is a link
@@ -113,6 +118,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				mediaCaption = result.getString(21/*"ZWAMESSAGEDATAITEM.ZTITLE"*/) /*result2.getString("ZTITLE")*/;
 				mediaName = result.getString(22/*"ZWAMESSAGEDATAITEM.ZSUMMARY"*/) /*result2.getString("ZSUMMARY")*/;
 				mediaWaType = -1; // actually for injecting
+				mediaUrl = result.getString(25/*"ZWAMESSAGEDATAITEM.ZCONTENT1"*/);
 			}
 			// the sent message is just a text message
 			else if(mediaWaType == 0){
@@ -341,7 +347,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 					}
 				}
 			}
-			init(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, mentionedJids, quotedMessage, thumbnail);
+			init(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, mentionedJids, quotedMessage, thumbnail, mediaUrl);
 		}catch(Exception ex){
 			System.out.println("failed populating from result set");
 			System.out.println(ex.getMessage());
@@ -379,7 +385,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				link = true;
 				media_wa_type = 0;
 			}
-			String insertStatement = "INSERT INTO " + table + "(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude, quoted_row_id, mentioned_jids) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+			String insertStatement = "INSERT INTO " + table + "(_id, key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, needs_push, status, key_id, longitude, latitude, quoted_row_id, mentioned_jids, media_url) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			PreparedStatement sql = android.prepareStatement(insertStatement);
 			sql.setLong(1, id);
@@ -433,11 +439,16 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			}else{
 				sql.setNull(19, Types.VARCHAR);
 			}
+			if(media_url != null){
+				sql.setString(20, media_url);
+			}else{
+				sql.setNull(20, Types.VARCHAR);
+			}
 			sql.execute();
 			sql.close();
 			if(link){
 				sql = android.prepareStatement("INSERT INTO messages_links(key_remote_jid, message_row_id, link_index) VALUES(?, ?, ?)");
-				sql.setString(1, remote_resource == null ? key_remote_jid : remote_resource);
+				sql.setString(1, key_remote_jid);
 				sql.setLong(2, id);
 				sql.setInt(3, 0);
 				sql.execute();
@@ -471,11 +482,11 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	}
 	public boolean cloneFromAndroid(Connection android, String keyId){
 		try{
-			PreparedStatement sql = android.prepareStatement("SELECT key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, longitude, latitude, key_id, mentioned_jids, quoted_row_id FROM messages WHERE key_id = ?");
+			PreparedStatement sql = android.prepareStatement("SELECT key_remote_jid, key_from_me, timestamp, media_caption, media_mime_type, media_name, data, media_wa_type, media_duration, remote_resource, thumb_image, longitude, latitude, key_id, mentioned_jids, quoted_row_id, media_url FROM messages WHERE key_id = ?");
 			sql.setString(1, keyId);
 			ResultSet result = sql.executeQuery();
 			if(result.next()){
-				init(0, result.getString("key_remote_jid"), result.getInt("key_from_me"), result.getLong("timestamp"), result.getString("media_caption"), result.getString("media_mime_type"), result.getString("media_name"), result.getString("data"), result.getInt("media_wa_type"), result.getInt("media_duration"), result.getString("remote_resource"), result.getBytes("thumb_image"), result.getFloat("longitude"), result.getFloat("latitude"), result.getString("key_id"), result.getString("mentioned_jids"), null, null);
+				init(0, result.getString("key_remote_jid"), result.getInt("key_from_me"), result.getLong("timestamp"), result.getString("media_caption"), result.getString("media_mime_type"), result.getString("media_name"), result.getString("data"), result.getInt("media_wa_type"), result.getInt("media_duration"), result.getString("remote_resource"), result.getBytes("thumb_image"), result.getFloat("longitude"), result.getFloat("latitude"), result.getString("key_id"), result.getString("mentioned_jids"), null, null, result.getString("media_url"));
 				quoted_row_id = result.getLong("quoted_row_id");
 			}else{
 				//message probably deleted

@@ -304,6 +304,11 @@ public class Migrator{
 				System.out.print("\r");
 				System.out.print("messages added: " + current + "/" + numberOfMessage);
 			}
+			ChatListItem chat = new ChatListItem();
+			if(!chat.updateLastMessage(android)){
+				System.out.print("failed to update the latest message id into the chat_list table");
+				return false;
+			}
 			System.out.println("\ndone!");
 			result.close();
 			sql.close();
