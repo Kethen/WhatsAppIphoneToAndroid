@@ -9,7 +9,8 @@ import java.sql.Types;
 import com.whatsapp.MediaData;
 import java.io.*;
 import java.util.Arrays;
-
+import java.awt.Image;
+import java.awt.image.BufferedImage;
 public class Migrator{
 	public Migrator(){}
 	/*db connection android*/
@@ -213,14 +214,14 @@ public class Migrator{
 			int fileCount = 0;
 			long current = 0;
 			System.out.println("begin message migration");
-			byte[] thumbImage = null;
-			byte[] rawData = null;
 			while(result.next()){
 				int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*//*"ZMESSAGETYPE"*/);
 				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
 					// write the item into the android database
 					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
 					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
+					byte[] thumbImage = null;
+					byte[] rawData = null;
 					// copy the file
 					if(mediaWaType == 8 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3){
 						String localMediaPath = result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/);
@@ -246,8 +247,6 @@ public class Migrator{
 							bufferedInFile.close();
 							bufferedOutFile.close();
 						}
-						// prepare a thumbnail for raw data
-						
 						// craft a com.whatsapp.MediaData object
 						
 						MediaData crafted = new MediaData();
@@ -292,7 +291,7 @@ public class Migrator{
 						thumbImage = craftedBuffer.toByteArray();
 					}
 					MessageItem message = new MessageItem();
-					if(!message.populateFromResult(iphone, result, 0, true, thumbImage, android)){
+					if(!message.populateFromResult(iphone, result, 0, true, thumbImage, android, iphoneFolder)){
 						System.out.println("loading message failed");
 						return false;
 					}
