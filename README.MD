@@ -53,7 +53,7 @@ Build:
 
 Usage:
 
-$java -jar whatsappi2a.jar <iphone ChatStorage.db path> <iphone net.whatsapp.Whatsapp path> <directory to output the WhatsApp directory> 
+$java -jar whatsappi2a.jar \<iphone ChatStorage.db path\> \<iphone net.whatsapp.Whatsapp path\> \<directory to output the WhatsApp directory\> 
 
 Open Source Software used in this project:
 
