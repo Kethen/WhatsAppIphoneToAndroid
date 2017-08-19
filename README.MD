@@ -37,7 +37,7 @@ What doesn't:
 
 Some older mentions can't be moved from iPhone, will be displaying as @phonenumber. Still investigating changes in the ZWAMEDIAITEM.ZMETADATA bplist
 
-**Due to recent changes on WhatsApp's end, chat groups' information are retrived from wa.db instead of msgstore.db, while restoring backup does not copy group info from msgstore.db to wa.db. Even with an official local backup, chat groups that you have left from or was removed from gets a subject of 'unknown subject'. If you have a rooted phone, you might be able to update records in wa.db to restore those name. Will further look into that since WhatsApp might fix this bug themselves.
+**Due to recent changes on WhatsApp's end, chat groups' information are retrived from wa.db instead of msgstore.db, while restoring backup does not copy group info from msgstore.db to wa.db. Even with an official local backup, chat groups that you have left from or was removed from gets a subject of 'unknown subject'. If you have a rooted phone, you might be able to update records in wa.db to restore those name. Will further look into that since WhatsApp team might fix this bug themselves.
 
 Output can be used in the following way:
 
