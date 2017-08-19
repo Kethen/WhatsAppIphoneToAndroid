@@ -4,26 +4,59 @@ This tool converts iphone ChatStorage.db + net.whatsapp.WhatsApp to android andr
 
 This is an Alpha release, I don't garunteer that this will work flawlessly. Please backup your data before trying.
 
-Currently this tool should be able to migrate messages, image, audio, video, contacts, location, documents and links
 
-Output can be used in these two ways:
+What works:
+
+Currently this tool should be able to migrate 
+
+
+1. messages
+
+2. active chat listing
+
+3. image
+
+4. audio
+
+5. video
+
+6. contacts
+
+7. location
+
+8. documents
+
+9. links
+
+10. recent mentions
+
+11. quotes
+
+
+What doesn't:
+
+Some older mentions can't be moved from iPhone, will be displaying as @phonenumber. Still investigating changes in the ZWAMEDIAITEM.ZMETADATA bplist
+
+**Due to recent changes on WhatsApp's end, chat groups' information are retrived from wa.db instead of msgstore.db, while restoring backup does not copy group info from msgstore.db to wa.db. Even with an official local backup, chat groups that you have left from or was removed from gets a subject of 'unknown subject'. If you have a rooted phone, you might be able to update records in wa.db to restore those name. Will further look into that since WhatsApp might fix this bug themselves.
+
+Output can be used in the following way:
 
 1. Wipe WhatsApp app data on anroid phone then restore the output as a backup after putting WhatsApp folder into /sdcard/
 
-2. After putting Whatsapp folder into /sdcard/, push the WhatsApp/Databases/msgstore.db into /data/data/com.whatsapp/databases while removing msgstore.db-shm and msgstore.db-wal. This way requires root and some knowledge on linux permissions and selinux
+**inserting msgstore.db into /data directly proves to make whatsapp unstable
 
-**You only need to do one of the above steps
 
 Build:
 
-1. Download sqlite jdbc driver from https://bitbucket.org/xerial/sqlite-jdbc/downloads/, this was written when the 3.20.0 version was the latest. Rename it to sqlite.jar and place it next to Makefile
+	$make
 
-2. Open a shell, move to the directory containing Makefile, run 
-
-$make
 
 Usage:
 
 $java -jar whatsappi2a.jar <iphone ChatStorage.db path> <iphone net.whatsapp.Whatsapp path> <directory to output the WhatsApp directory> 
 
-**You need sqlite.jar next to whatsappi2a.jar for the sqlite jdbc driver to work (loaded as a library)
+Open Source Software used in this project:
+
+java-bplist : https://github.com/pvanassen/java-bplist
+
+sqlite-jdbc : https://github.com/xerial/sqlite-jdbc
