@@ -59,4 +59,10 @@ Open Source Software used in this project:
 
 java-bplist : https://github.com/pvanassen/java-bplist
 
+	which depends on:
+
+	apache_commons_io: http://commons.apache.org/proper/commons-io/download_io.cgi
+
+	slf4j: https://www.slf4j.org/
+
 sqlite-jdbc : https://github.com/xerial/sqlite-jdbc
