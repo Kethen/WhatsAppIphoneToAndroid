@@ -14,15 +14,37 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 	String key_remote_jid; // ZCONTACTJID
 	String subject; // ZPARTNERNAME 
 	int last_message_table_id; // _id of a message
-	int creation; // millisecond
+	long creation; // millisecond
 	int archived; // null if 0
 	long sort_timestamp; //ZLASTMESSAGEDATE, Android: Millisecond Unix, iPhone: NSDate=Unix - 978307200
 	int my_messages; // =1
 	int plaintext_disabled; // =1
-	public ChatListItem(){
-		return;
+	W2ALogInterface log;
+	public static final String standardsql = "SELECT ZWACHATSESSION.ZCONTACTJID, ZWACHATSESSION.ZPARTNERNAME, ZWACHATSESSION.ZLASTMESSAGEDATE, ZWACHATSESSION.ZARCHIVED, ZWACHATSESSION.ZLASTMESSAGE, ZWAGROUPINFO.Z_PK, ZWAGROUPINFO.ZCREATIONDATE FROM ZWACHATSESSION LEFT JOIN ZWAGROUPINFO ON ZWACHATSESSION.ZGROUPINFO = ZWAGROUPINFO.Z_PK";
+	public ChatListItem(W2ALogInterface log){
+		this.log = log;
 	}
-	public ChatListItem(String key_remote_jid, String subject, int archived, long sort_timestamp, int last_message_table_id){
+	public boolean populateFromResult(ResultSet result){
+		try{
+			String subject = null;
+			if(result.getString(6/*"ZGROUPINFO"*/) != null){
+				subject = result.getString(2/*"ZPARTNERNAME"*/);
+			}
+			String jid  = result.getString(1/*"ZCONTACTJID"*/);
+			int archived = result.getInt(4/*"ZARCHIVED"*/);
+			long timestamp = nsDateToMilliSecondTimeStamp(result.getFloat(3/*"ZLASTMESSAGEDATE"*/));
+			int lastmsg = 0; //result.getInt(5/*"ZLASTMESSAGE"*/)*/;
+			long creation = nsDateToMilliSecondTimeStamp(result.getFloat(7/*"ZCREATIONDATE"*/));
+			init(jid, subject, archived, timestamp, lastmsg, creation);
+		}catch(Exception ex){
+			log.println("failed populating from result");
+			log.println(ex.getMessage());
+			ex.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+	public void init(String key_remote_jid, String subject, int archived, long sort_timestamp, int last_message_table_id, long creation){
 		my_messages = 1;
 		plaintext_disabled = 1;
 		creation = 0;
@@ -53,7 +75,12 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 			}else{
 				newRow.setString(2, subject);
 			}
-			newRow.setInt(3, creation);
+			if(creation != 0){
+				newRow.setLong(3, creation);
+			}
+			else{
+				newRow.setNull(3, Types.INTEGER);
+			}
 			if(archived != 0){
 				newRow.setInt(4, archived);
 			}else{
@@ -98,14 +125,13 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 				long firstMsgTimeStamp = result2.getLong("MIN(timestamp)");
 				result2.close();
 				sql2.close();
-				sql2 = android.prepareStatement("UPDATE chat_list SET last_message_table_id = ?, message_table_id = ?, last_read_message_table_id = ?, sort_timestamp = ?, creation = ?, last_read_receipt_sent_message_table_id = ? WHERE key_remote_jid = ?");
+				sql2 = android.prepareStatement("UPDATE chat_list SET last_message_table_id = ?, message_table_id = ?, last_read_message_table_id = ?, sort_timestamp = ?, last_read_receipt_sent_message_table_id = ? WHERE key_remote_jid = ?");
 				sql2.setLong(1, latestMsgId);
 				sql2.setLong(2, latestMsgId);
 				sql2.setLong(3, latestMsgId);
 				sql2.setLong(4, lastMsgTimeStamp);
-				sql2.setLong(5, firstMsgTimeStamp);
-				sql2.setLong(6, latestMsgId);
-				sql2.setString(7, jid);
+				sql2.setLong(5, latestMsgId);
+				sql2.setString(6, jid);
 				sql2.execute();
 				sql2.close();
 			}
@@ -116,5 +142,9 @@ public class ChatListItem{ // chat_list <- ZWACHATSESSION
 			return false;
 		}
 		return true;
+	}
+	// helper functions
+	public static long nsDateToMilliSecondTimeStamp(float in){
+		return (long) Math.floor(1000 * (in + 978307200));
 	}
 }

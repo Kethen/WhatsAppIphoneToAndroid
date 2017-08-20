@@ -32,13 +32,16 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	String remote_resource; // ZGROUPMEMBER not null -> ZWAGROUPMEMBER -> ZMEMBERJID
 	byte[] thumb_image; // serialized java data, com.whatsapp.MediaDat
 	byte[] thumbnailImage; // for media with files, interestingly thumbnail images are stored in another table. this ia a place holder
-	float longitude;
-	float latitude;
-	long quoted_row_id;
-	String media_url;
-	String mentioned_jids;
+	float longitude, width; // longitude, media width
+	float latitude, height; // latitude, media height
+	long quoted_row_id; // bplist parsing
+	String media_url; // if it's a link, put it in media_url from ZWAMESSAGEDATAITEM->ZCONTENT1
+	String mentioned_jids; // bplist parsing
+	int size; // media size
+	String localMediaPath; // path in iphone folder
 	MessageItem quote;
-	
+	W2ALogInterface log;
+	public static int fileCount;
 	public static final String standardSql = "SELECT ZWAMESSAGE.ZTOJID, ZWAMESSAGE.ZFROMJID, ZWAMESSAGE.ZISFROMME, ZWAMESSAGE.ZMESSAGEDATE, ZWAMESSAGE.ZTEXT, ZWAMESSAGE.Z_PK, ZWAMESSAGE.ZMESSAGETYPE, ZWAMESSAGE.ZSTANZAID, "
 		+
 		/*9*/"ZWAMEDIAITEM.Z_PK, ZWAMEDIAITEM.ZTITLE, ZWAMEDIAITEM.ZVCARDSTRING, ZWAMEDIAITEM.ZVCARDNAME, ZWAMEDIAITEM.ZMOVIEDURATION, ZWAMEDIAITEM.ZFILESIZE, ZWAMEDIAITEM.ZMEDIALOCALPATH, ZWAMEDIAITEM.ZLONGITUDE, ZWAMEDIAITEM.ZLATITUDE, "
@@ -60,7 +63,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		"LEFT JOIN ZWAMESSAGEDATAITEM ON ZWAMESSAGE.Z_PK = ZWAMESSAGEDATAITEM.ZMESSAGE ";
 	public static final String standardSqlAfterWhere = "GROUP BY ZWAMESSAGE.Z_PK ORDER BY ZWAMESSAGE.ZMESSAGEDATE";
 	// *** if ZWAMESSAGEDATAITEM record exists, add messages_links record
-	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote, byte[] thumbnailImage, String media_url){
+	public void init(long id, String key_remote_jid, int key_from_me, long timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image, float longitude, float latitude, String key_id, String mentioned_jids, MessageItem quote, byte[] thumbnailImage, String media_url, String localMediaPath, float width, float height, int size){
 		status = key_from_me == 1 ? 13 : 0;
 		needs_push = 0;
 		quoted_row_id = 0;
@@ -83,11 +86,15 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 		this.quote = quote;
 		this.thumbnailImage = thumbnailImage;
 		this.media_url = media_url;
+		this.localMediaPath = localMediaPath;
+		this.width = width;
+		this.height = height;
+		this.size = size;
 	}
-	public MessageItem(){
-		return;
+	public MessageItem(W2ALogInterface log){
+		this.log = log;
 	}
-	public boolean populateFromResult(Connection iphone, ResultSet result, long id, boolean checkQuoted, byte[] thumbImage, Connection android, File iphoneFolder){
+	public boolean populateFromResult(Connection iphone, ResultSet result, long id, boolean checkQuoted, Connection android, File iphoneFolder){
 		try{
 			String remoteResource = null;
 			if(result.getInt(18/*("ZWAGROUPMEMBER.Z_PK"*//*"ZGROUPMEMBER"*/) != 0){
@@ -112,6 +119,10 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			String mediaUrl = null;
 			int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*/);
 			byte[] thumbnail = null;
+			float mediaWidth = 0;
+			float mediaHeight = 0;
+			int mediaSize = 0;
+			byte[] thumbImage = null;
 			// the sent message is a link
 			if(result.getInt(20/*"ZWAMESSAGEDATAITEM.Z_PK"*/) != 0){
 				data = result.getString(5/*"ZWAMESSAGE.ZTEXT"*//*"ZTEXT"*/);
@@ -145,6 +156,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 					mediaMimeType = vcardString;
 					mediaCaption = result.getString(10/*"ZWAMEDIAITEM.ZTITLE"*/)/*result2.getString("ZTITLE")*/;
 					mediaDuration = result.getInt(13/*"ZWAMEDIAITEM.ZMOVIEDURATION"*/)/*result2.getInt("ZMOVIEDURATION")*/;
+					mediaSize = result.getInt(14/*"ZWAMEDIAITEM.ZFILESIZE"*/)/*result2.getInt("ZFILESIZE")*/;
+					
 					// file copying and thumimage generation in parent due to number of file tracking
 					// media is a document
 					if(mediaWaType == 8){
@@ -168,6 +181,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 					// media is a video
 					else if(vcardString != null && vcardString.indexOf("video") == 0){
 						mediaWaType = 3;
+						mediaWidth = result.getFloat(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getFloat("ZLONGITUDE")*/;
+						mediaHeight = result.getFloat(17/*"ZWAMEDIAITEM.ZLATITUDE"*/)/*result2.getFloat("ZLATITUDE")*/;
 					}
 					// media is an image
 					else if(vcardString != null && vcardString.indexOf("image") == 0){
@@ -215,13 +230,13 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			if(checkQuoted){
 				byte[] bplist = result.getBytes(23/*"ZWAMEDIAITEM.ZMETADATA"*/);
 				if(bplist != null){
-					//System.out.println("bplist != null");
+					//log.println("bplist != null");
 					ConvertToXml converter = new ConvertToXml();
 					XMLElement xml = null;
 					try{
 						xml = converter.convertToXml(new ByteArrayInputStream(bplist));
 					}catch(Exception ex){
-						System.out.println("bad bplist from ZMETADATA x.x");
+						log.println("bad bplist from ZMETADATA x.x");
 						return false;
 					}
 
@@ -302,9 +317,9 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 											sql.setString(1, quotedMessageKeyId);
 											ResultSet result2 = sql.executeQuery();
 											if(result2.next()){
-												quotedMessage = new MessageItem();
-												if(!quotedMessage.populateFromResult(iphone, result2, 0, false, null, android, iphoneFolder)){
-													System.out.println("failed loading quoted message");
+												quotedMessage = new MessageItem(log);
+												if(!quotedMessage.populateFromResult(iphone, result2, 0, false, android, iphoneFolder)){
+													log.println("failed loading quoted message");
 													return false;
 												}
 											}
@@ -347,17 +362,84 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 					}
 				}
 			}
-			init(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, mentionedJids, quotedMessage, thumbnail, mediaUrl);
+			init(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId, mentionedJids, quotedMessage, thumbnail, mediaUrl, result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/), mediaWidth, mediaHeight, mediaSize);
 		}catch(Exception ex){
-			System.out.println("failed populating from result set");
-			System.out.println(ex.getMessage());
+			log.println("failed populating from result set");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
 		return true;
 	}
-	public long injectAndroid(Connection android, boolean quoted){
+	public long injectAndroid(Connection android, boolean quoted, File iphoneFolder, File whatsappFolder){
 		try{
+			if(localMediaPath != null && !quoted){
+				// copy the file
+				String fileExtension = null;
+				if(localMediaPath != null){
+					String[] splitted = localMediaPath.split("\\.");
+					if(splitted.length == 0){
+						log.println("sum ting wong with ZMEDIALOCALPATH");
+						log.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
+						return -1;
+					}
+					fileExtension = splitted[splitted.length - 1];
+					FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
+					FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
+					BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
+					BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
+					byte[] copyBuffer = new byte[1024];
+					int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+					while(readSize != -1){
+						bufferedOutFile.write(copyBuffer, 0, readSize);
+						readSize = bufferedInFile.read(copyBuffer, 0, 1024);
+					}
+					bufferedInFile.close();
+					bufferedOutFile.close();
+				}
+				
+				// craft a com.whatsapp.MediaData object
+				MediaData crafted = new MediaData();
+				crafted.transferred = true;
+				if(localMediaPath != null){
+					crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
+				}else{
+					crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
+				}
+				crafted.fileSize = size;
+				if(media_wa_type == 3){
+					crafted.faceX = 0;
+					crafted.faceY = 0;
+				}else{
+					crafted.faceX = -1;
+					crafted.faceY = -1;
+				}
+				crafted.mediaKey = new byte[3];
+				Arrays.fill(crafted.mediaKey, (byte) 'A');
+				crafted.refKey = new byte[3];
+				Arrays.fill(crafted.refKey, (byte) 'A');
+				crafted.cipherKey = new byte[3];
+				Arrays.fill(crafted.cipherKey, (byte) 'A');
+				crafted.hmacKey = new byte[3];
+				Arrays.fill(crafted.hmacKey, (byte) 'A');
+				crafted.iv = new byte[3];
+				Arrays.fill(crafted.iv, (byte) 'A');
+				crafted.failErrorCode = 0;
+				crafted.width = (int)width;
+				crafted.height = (int)height;
+				crafted.doodleId = "Does it really matter?";
+				crafted.gifAttribution = 0;
+				crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
+				crafted.uploadRetry = false;
+				crafted.suspiciousContent = 0;
+				fileCount++;
+				// serialize the object
+				ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
+				ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
+				objectOutput.writeObject(crafted);
+				objectOutput.close();
+				thumb_image = craftedBuffer.toByteArray();
+			}
 			String table;
 			if(quoted){
 				table = "messages_quotes";
@@ -374,9 +456,9 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				}
 			}
 			if(quote != null && !quoted){
-				quoted_row_id = quote.injectAndroid(android, true);
+				quoted_row_id = quote.injectAndroid(android, true, iphoneFolder, whatsappFolder);
 				if(quoted_row_id == -1){
-					System.out.println("failed inserting quoted message");
+					log.println("failed inserting quoted message");
 					return -1;
 				}
 			}
@@ -473,8 +555,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				}
 			}
 		}catch(Exception ex){
-			System.out.println("failed to inject message " + id + "\nquoted: " + quoted + "\nkey_id: " + key_id);
-			System.out.println(ex.getMessage());
+			log.println("failed to inject message " + id + "\nquoted: " + quoted + "\nkey_id: " + key_id);
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return -1;
 		}
@@ -486,12 +568,12 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 			sql.setString(1, keyId);
 			ResultSet result = sql.executeQuery();
 			if(result.next()){
-				init(0, result.getString("key_remote_jid"), result.getInt("key_from_me"), result.getLong("timestamp"), result.getString("media_caption"), result.getString("media_mime_type"), result.getString("media_name"), result.getString("data"), result.getInt("media_wa_type"), result.getInt("media_duration"), result.getString("remote_resource"), result.getBytes("thumb_image"), result.getFloat("longitude"), result.getFloat("latitude"), result.getString("key_id"), result.getString("mentioned_jids"), null, null, result.getString("media_url"));
+				init(0, result.getString("key_remote_jid"), result.getInt("key_from_me"), result.getLong("timestamp"), result.getString("media_caption"), result.getString("media_mime_type"), result.getString("media_name"), result.getString("data"), result.getInt("media_wa_type"), result.getInt("media_duration"), result.getString("remote_resource"), result.getBytes("thumb_image"), result.getFloat("longitude"), result.getFloat("latitude"), result.getString("key_id"), result.getString("mentioned_jids"), null, null, result.getString("media_url"), null, 0, 0, 0);
 				quoted_row_id = result.getLong("quoted_row_id");
 			}else{
 				//message probably deleted
-				//System.out.println("clone from android failed");
-				//System.out.println("\ncan't find message, from future perhaps? key_id: " + keyId);
+				//log.println("clone from android failed");
+				//log.println("\ncan't find message, from future perhaps? key_id: " + keyId);
 				return false;
 			}
 			result.close();
@@ -503,8 +585,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 				thumbnailImage = result.getBytes("thumbnail");
 			}
 		}catch(Exception ex){
-			System.out.println("clone from android failed");
-			System.out.println(ex.getMessage());
+			log.println("clone from android failed");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}

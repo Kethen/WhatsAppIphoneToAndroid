@@ -12,23 +12,26 @@ import java.util.Arrays;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 public class Migrator{
-	public Migrator(){}
+	public Migrator(W2ALogInterface log){
+		this.log = log;
+	}
 	/*db connection android*/
 	Connection android;
 	/*db connection iphone*/
 	Connection iphone;
 	File whatsappFolder;
 	File iphoneFolder;
+	W2ALogInterface log;
 	boolean loadIphoneDb(String path){
 		try{
 			iphone = DriverManager.getConnection("jdbc:sqlite:" + path);
 			if(iphone == null){
-				System.out.println("failed opening iphone database");
+				log.println("failed opening iphone database");
 				return false;
 			}
 		}catch(Exception ex){
-			System.out.println("failed opening iphone database");
-			System.out.println(ex.getMessage());
+			log.println("failed opening iphone database");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 		}
 		return true;
@@ -37,7 +40,7 @@ public class Migrator{
 		try{
 			File check = new File(path2);
 			if(check.exists()){
-				System.out.println("database file " + path2 + " exists!");
+				log.println("database file " + path2 + " exists!");
 				return false;
 			}
 			FileInputStream dbtemplate = new FileInputStream(path);
@@ -53,13 +56,13 @@ public class Migrator{
 			bufferedOutFile.close();
 			android = DriverManager.getConnection("jdbc:sqlite:" + path2);
 			if(android == null){
-				System.out.println("failed opening android database");
+				log.println("failed opening android database");
 				return false;
 			}
 			
 		}catch(Exception ex){
-			System.out.println("failed opening android database");
-			System.out.println(ex.getMessage());
+			log.println("failed opening android database");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 		}
 		return true;
@@ -68,8 +71,8 @@ public class Migrator{
 		try{
 			iphone.close();
 		}catch(Exception ex){
-			System.out.println("error closing iphone database");
-			System.out.println(ex.getMessage());
+			log.println("error closing iphone database");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -79,8 +82,8 @@ public class Migrator{
 		try{
 			android.close();
 		}catch(Exception ex){
-			System.out.println("error closing android database");
-			System.out.println(ex.getMessage());
+			log.println("error closing android database");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -94,8 +97,8 @@ public class Migrator{
 			new File(whatsappFolder.getAbsolutePath() + "/Media/From iPhone").mkdirs();
 			new File(whatsappFolder.getAbsolutePath() + "/Databases").mkdir();
 		}catch(Exception ex){
-			System.out.println("create folder failed");
-			System.out.println(ex.getMessage());
+			log.println("create folder failed");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -105,13 +108,13 @@ public class Migrator{
 		try{
 			iphoneFolder = new File(path + "/Library/Media");
 			if(!iphoneFolder.isDirectory()){
-				System.out.println("folder does not exist");
+				log.println("folder does not exist");
 				return false;
 			}
 			iphoneFolder = new File(path + "/Library");
 		}catch(Exception ex){
-			System.out.println("cannot open iphone folder");
-			System.out.println(ex.getMessage());
+			log.println("cannot open iphone folder");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -122,7 +125,7 @@ public class Migrator{
 		try{
 			File check = new File(path);
 			if(check.exists()){
-				System.out.println("database file " + path + " exists!");
+				log.println("database file " + path + " exists!");
 				return false;
 			}
 			InputStream dbTemplate = this.getClass().getClassLoader().getResourceAsStream("template.db");
@@ -137,8 +140,8 @@ public class Migrator{
 			bufferedOutFile.close();
 			android = DriverManager.getConnection("jdbc:sqlite:" + path);
 		}catch(Exception ex){
-			System.out.println("create database failed!");
-			System.out.println(ex.getMessage());
+			log.println("create database failed!");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -146,11 +149,11 @@ public class Migrator{
 	}
 	boolean iphone2Android(){
 		if(iphone == null){
-			System.out.println("iphone database not loaded");
+			log.println("iphone database not loaded");
 			return false;
 		}
 		if(android == null){
-			System.out.println("android database not loaded");
+			log.println("android database not loaded");
 			return false;
 		}
 		// first work with chat list
@@ -162,41 +165,38 @@ public class Migrator{
 			result.close();
 			sql.close();
 			sql = iphone.createStatement();
-			result = sql.executeQuery("SELECT ZCONTACTJID, ZPARTNERNAME, ZLASTMESSAGEDATE, ZARCHIVED, ZGROUPINFO, ZLASTMESSAGE FROM ZWACHATSESSION");
+			result = sql.executeQuery(ChatListItem.standardsql);
 			long current = 0;
 			//String key_remote_jid, String subject, int archived, int sort_timestamp
-			System.out.println("begin chatlist migration");
+			log.println("begin chatlist migration");
 			while(result.next()){
-				String jid = result.getString("ZCONTACTJID");
+				String jid = result.getString(1/*"ZCONTACTJID"*/);
 				PreparedStatement sql2 = iphone.prepareStatement("SELECT COUNT(Z_PK) AS number FROM ZWAMESSAGE WHERE (ZFROMJID = ? OR ZTOJID = ?) AND (ZMESSAGETYPE = 0 OR ZMESSAGETYPE = 1 OR ZMESSAGETYPE = 2 OR ZMESSAGETYPE = 3 OR ZMESSAGETYPE = 4 OR ZMESSAGETYPE = 5 OR ZMESSAGETYPE = 8)");
 				sql2.setString(1, jid);
 				sql2.setString(2, jid);
 				ResultSet result2 = sql2.executeQuery();
 				result2.next();
 				if(result2.getInt("number") != 0){
-					String subject = null;
-					if(result.getString("ZGROUPINFO") != null){
-						subject = result.getString("ZPARTNERNAME");
+					ChatListItem row = new ChatListItem(log);
+					if(!row.populateFromResult(result)){
+						log.println("failed loading chatlist");
+						return false;
 					}
-					int archived = result.getInt("ZARCHIVED");
-					long timestamp = MessageItem.nsDateToMilliSecondTimeStamp(result.getFloat("ZLASTMESSAGEDATE"));
-					int lastmsg = result.getInt("ZLASTMESSAGE");
-					ChatListItem row = new ChatListItem(jid, subject, archived, timestamp, lastmsg);
 					if(!row.injectAndroid(android)){
-						System.out.println("insert chatlist failed");
+						log.println("insert chatlist failed");
 						return false;
 					}
 				}
 				current++;
-				System.out.print("\r");
-				System.out.print("chat sessions added: " + current + "/" + numberOfSessions);
+				log.print("\r");
+				log.print("chat sessions added: " + current + "/" + numberOfSessions);
 			}
-			System.out.println("");
+			log.println("");
 			result.close();
 			sql.close();
 		}catch(Exception ex){
-			System.out.println("insert chatlist failed");
-			System.out.println(ex.getMessage());
+			log.println("insert chatlist failed");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -211,110 +211,37 @@ public class Migrator{
 			sql = iphone.createStatement();
 			result = sql.executeQuery(MessageItem.standardSql + MessageItem.standardSqlAfterWhere);
 			// file counter
-			int fileCount = 0;
+			MessageItem.fileCount = 0;
 			long current = 0;
-			System.out.println("begin message migration");
+			log.println("begin message migration");
 			while(result.next()){
 				int mediaWaType = result.getInt(7/*"ZWAMESSAGE.ZMESSAGETYPE"*//*"ZMESSAGETYPE"*/);
 				if(mediaWaType == 0 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3 || mediaWaType == 4 || mediaWaType == 5 || mediaWaType == 8){
-					// write the item into the android database
-					//public MessageItem(int id, String key_remote_jid, int key_from_me, int timestamp, String media_caption, String media_mime_type, String media_name, String data, int media_wa_type, int media_duration, String remote_resource, byte[] thumb_image)
-					//MessageItem message = new MessageItem(id, jid, fromMe, msgDate, mediaCaption, mediaMimeType, mediaName, data, mediaWaType, mediaDuration, remoteResource, thumbImage, longitude, latitude, keyId);
-					byte[] thumbImage = null;
-					byte[] rawData = null;
-					// copy the file
-					if(mediaWaType == 8 || mediaWaType == 1 || mediaWaType == 2 || mediaWaType == 3){
-						String localMediaPath = result.getString(15/*"ZWAMEDIAITEM.ZMEDIALOCALPATH"*/);
-						String fileExtension = null;
-						if(localMediaPath != null){
-							String[] splitted = localMediaPath.split("\\.");
-							if(splitted.length == 0){
-								System.out.println("sum ting wong with ZMEDIALOCALPATH");
-								System.out.println("ZMEDIALOCALPATH currently is: " + localMediaPath);
-								return false;
-							}
-							fileExtension = splitted[splitted.length - 1];
-							FileInputStream inFile = new FileInputStream(iphoneFolder.getAbsolutePath() + "/" + localMediaPath);
-							FileOutputStream outFile = new FileOutputStream(whatsappFolder.getAbsolutePath() + "/Media/From iPhone/" + fileCount + "." + fileExtension);
-							BufferedInputStream bufferedInFile = new BufferedInputStream(inFile);
-							BufferedOutputStream bufferedOutFile = new BufferedOutputStream(outFile);
-							byte[] copyBuffer = new byte[1024];
-							int readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-							while(readSize != -1){
-								bufferedOutFile.write(copyBuffer, 0, readSize);
-								readSize = bufferedInFile.read(copyBuffer, 0, 1024);
-							}
-							bufferedInFile.close();
-							bufferedOutFile.close();
-						}
-						// craft a com.whatsapp.MediaData object
-						
-						MediaData crafted = new MediaData();
-						crafted.transferred = true;
-						if(localMediaPath != null){
-							crafted.file = new File("Media/From Iphone/" + fileCount + "." + fileExtension);
-						}else{
-							crafted.file = new File("Media/From Iphone/OVERTHERAINBOW");
-						}
-						crafted.fileSize = result.getInt(14/*"ZWAMEDIAITEM.ZFILESIZE"*/)/*result2.getInt("ZFILESIZE")*/;
-						crafted.suspiciousContent = 0;
-						if(mediaWaType == 3){
-							crafted.faceX = 0;
-							crafted.faceY = 0;
-						}else{
-							crafted.faceX = -1;
-							crafted.faceY = -1;
-						}
-						crafted.mediaKey = new byte[3];
-						Arrays.fill(crafted.mediaKey, (byte) 'A');
-						crafted.refKey = new byte[3];
-						Arrays.fill(crafted.refKey, (byte) 'A');
-						crafted.cipherKey = new byte[3];
-						Arrays.fill(crafted.cipherKey, (byte) 'A');
-						crafted.hmacKey = new byte[3];
-						Arrays.fill(crafted.hmacKey, (byte) 'A');
-						crafted.iv = new byte[3];
-						Arrays.fill(crafted.iv, (byte) 'A');
-						crafted.failErrorCode = 0;
-						crafted.width = result.getInt(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getInt("ZLONGITUDE")*/;
-						crafted.height = result.getInt(17/*"ZWAMEDIAITEM.ZLATITUDE"*/) /*result2.getInt("ZLATITUDE")*/;
-						crafted.doodleId = "Does it really matter?";
-						crafted.gifAttribution = 0;
-						crafted.thumbnailHeightWidthRatio = crafted.height == 0 ? 0 : crafted.width / crafted.height;
-						crafted.uploadRetry = false;
-						fileCount++;
-						// serialize the object
-						ByteArrayOutputStream craftedBuffer = new ByteArrayOutputStream();
-						ObjectOutputStream objectOutput = new ObjectOutputStream(craftedBuffer);
-						objectOutput.writeObject(crafted);
-						objectOutput.close();
-						thumbImage = craftedBuffer.toByteArray();
-					}
-					MessageItem message = new MessageItem();
-					if(!message.populateFromResult(iphone, result, 0, true, thumbImage, android, iphoneFolder)){
-						System.out.println("loading message failed");
+					MessageItem message = new MessageItem(log);
+					if(!message.populateFromResult(iphone, result, 0, true, android, iphoneFolder)){
+						log.println("loading message failed");
 						return false;
 					}
-					if(message.injectAndroid(android, false) == -1){
-						System.out.println("insert message failed");
+					if(message.injectAndroid(android, false, iphoneFolder, whatsappFolder) == -1){
+						log.println("insert message failed");
 						return false;
 					}
 				}
 				current++;
-				System.out.print("\r");
-				System.out.print("messages added: " + current + "/" + numberOfMessage);
+				log.print("\r");
+				log.print("messages added: " + current + "/" + numberOfMessage);
 			}
-			ChatListItem chat = new ChatListItem();
+			ChatListItem chat = new ChatListItem(log);
 			if(!chat.updateLastMessage(android)){
-				System.out.print("failed to update the latest message id into the chat_list table");
+				log.print("failed to update the latest message id into the chat_list table");
 				return false;
 			}
-			System.out.println("\ndone!");
+			log.println("\ndone!");
 			result.close();
 			sql.close();
 		}catch(Exception ex){
-			System.out.println("insert message failed");
-			System.out.println(ex.getMessage());
+			log.println("insert message failed");
+			log.println(ex.getMessage());
 			ex.printStackTrace();
 			return false;
 		}
@@ -336,7 +263,7 @@ public class Migrator{
 			System.out.println("Usage: java -jar whatsappi2a.jar <iphone database> <iphone folder (net.whatsapp.WhatsApp)> <android folder output>");
 			return;
 		}
-		Migrator instance = new Migrator();
+		Migrator instance = new Migrator(new W2ALogInterface());
 		instance.standardFlow(param[0], param[1], param[2]);
 	}
 }
