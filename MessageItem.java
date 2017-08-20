@@ -187,6 +187,8 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 					// media is an image
 					else if(vcardString != null && vcardString.indexOf("image") == 0){
 						mediaWaType = 1;
+						mediaWidth = result.getFloat(16/*"ZWAMEDIAITEM.ZLONGITUDE"*/)/*result2.getFloat("ZLONGITUDE")*/;
+						mediaHeight = result.getFloat(17/*"ZWAMEDIAITEM.ZLATITUDE"*/)/*result2.getFloat("ZLATITUDE")*/;
 					}
 					
 				}
@@ -373,7 +375,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	}
 	public long injectAndroid(Connection android, boolean quoted, File iphoneFolder, File whatsappFolder){
 		try{
-			if(localMediaPath != null && !quoted){
+			if(media_wa_type == 1 || media_wa_type == 2 || media_wa_type == 3 || media_wa_type == 9 && !quoted){
 				// copy the file
 				String fileExtension = null;
 				if(localMediaPath != null){
