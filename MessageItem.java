@@ -375,7 +375,7 @@ public class MessageItem{ // messages <- ZWAMESSAGE
 	}
 	public long injectAndroid(Connection android, boolean quoted, File iphoneFolder, File whatsappFolder){
 		try{
-			if(media_wa_type == 1 || media_wa_type == 2 || media_wa_type == 3 || media_wa_type == 9 && !quoted){
+			if((media_wa_type == 1 || media_wa_type == 2 || media_wa_type == 3 || media_wa_type == 9) && !quoted){
 				// copy the file
 				String fileExtension = null;
 				if(localMediaPath != null){
